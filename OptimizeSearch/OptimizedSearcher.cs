@@ -34,7 +34,7 @@ namespace OptimizeSearch
         private void IndexItem(T item, Type type, HashSet<object> visited = null)
         {
             if (visited == null) visited = new HashSet<object>();
-            if (item == null || visited.Contains(item)) return; // Prevent infinite recursion
+            if (item == null || visited.Contains(item)) return;
             visited.Add(item);
 
             var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
@@ -92,6 +92,20 @@ namespace OptimizeSearch
                                 _byteArrayIndex[hexKey] = set;
                             }
                             set.Add(item);
+                        }
+                    }
+                }
+                else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(propType) && propType != typeof(string) && propType != typeof(byte[]))
+                {
+                    // Handle collections like List<ComplexData>
+                    if (value is System.Collections.IEnumerable enumerable)
+                    {
+                        foreach (var element in enumerable)
+                        {
+                            if (element != null)
+                            {
+                                IndexItem(item, element.GetType(), visited);
+                            }
                         }
                     }
                 }
@@ -191,6 +205,17 @@ namespace OptimizeSearch
                         var hexValue = BitConverter.ToString(byteValue).Replace("-", "");
                         if (hexValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
                             return true;
+                    }
+                }
+                else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(propType) && propType != typeof(string) && propType != typeof(byte[]))
+                {
+                    if (value is System.Collections.IEnumerable enumerable)
+                    {
+                        foreach (var element in enumerable)
+                        {
+                            if (element != null && ContainsMatchRecursive(element, element.GetType(), searchString, visited))
+                                return true;
+                        }
                     }
                 }
                 else if (!propType.IsPrimitive && propType != typeof(object) && !propType.IsValueType && propType.IsClass)
