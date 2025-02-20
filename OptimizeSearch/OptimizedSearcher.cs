@@ -10,7 +10,7 @@ namespace OptimizeSearch
     {
         private readonly Dictionary<string, HashSet<T>> _stringIndex;
         private readonly Dictionary<int, HashSet<T>> _intIndex;
-        private readonly Dictionary<string, HashSet<T>> _byteArrayIndex;
+        private readonly Dictionary<string, HashSet<T>> _byteArrayIndex; // Keys are MAC (6 bytes) or GUID (16 bytes) strings
         private readonly IEnumerable<T> _items;
 
         public OptimizedSearcher(IEnumerable<T> items)
@@ -83,13 +83,26 @@ namespace OptimizeSearch
                 {
                     if (value is byte[] byteValue && byteValue.Length > 0)
                     {
-                        var hexKey = BitConverter.ToString(byteValue).Replace("-", "");
+                        string key;
+                        if (byteValue.Length == 6) // MAC Address
+                        {
+                            key = FormatMacAddress(byteValue);
+                        }
+                        else if (byteValue.Length == 16) // GUID
+                        {
+                            key = new Guid(byteValue).ToString();
+                        }
+                        else // Generic byte array
+                        {
+                            key = BitConverter.ToString(byteValue).Replace("-", "");
+                        }
+
                         lock (_byteArrayIndex)
                         {
-                            if (!_byteArrayIndex.TryGetValue(hexKey, out var set))
+                            if (!_byteArrayIndex.TryGetValue(key, out var set))
                             {
                                 set = new HashSet<T>();
-                                _byteArrayIndex[hexKey] = set;
+                                _byteArrayIndex[key] = set;
                             }
                             set.Add(item);
                         }
@@ -97,7 +110,6 @@ namespace OptimizeSearch
                 }
                 else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(propType) && propType != typeof(string) && propType != typeof(byte[]))
                 {
-                    // Handle collections like List<ComplexData>
                     if (value is System.Collections.IEnumerable enumerable)
                     {
                         foreach (var element in enumerable)
@@ -111,10 +123,15 @@ namespace OptimizeSearch
                 }
                 else if (!propType.IsPrimitive && propType != typeof(object) && !propType.IsValueType && propType.IsClass)
                 {
-                    // Recursively index complex properties
                     IndexItem(item, propType, visited);
                 }
             }
+        }
+
+        private string FormatMacAddress(byte[] bytes)
+        {
+            if (bytes.Length != 6) throw new ArgumentException("MAC address must be 6 bytes.");
+            return string.Join(":", bytes.Select(b => b.ToString("X2")));
         }
 
         public IEnumerable<T> Search(string searchString)
@@ -153,7 +170,7 @@ namespace OptimizeSearch
             if (stringResults != null)
                 results.UnionWith(stringResults);
 
-            // Search byte[] (exact hex match or substring)
+            // Search byte[] (MAC, GUID, or generic)
             if (_byteArrayIndex.TryGetValue(searchString, out var byteMatches))
             {
                 results.UnionWith(byteMatches);
@@ -202,8 +219,20 @@ namespace OptimizeSearch
                 {
                     if (value is byte[] byteValue && byteValue != null)
                     {
-                        var hexValue = BitConverter.ToString(byteValue).Replace("-", "");
-                        if (hexValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
+                        string formattedValue;
+                        if (byteValue.Length == 6) // MAC Address
+                        {
+                            formattedValue = FormatMacAddress(byteValue);
+                        }
+                        else if (byteValue.Length == 16) // GUID
+                        {
+                            formattedValue = new Guid(byteValue).ToString();
+                        }
+                        else // Generic byte array
+                        {
+                            formattedValue = BitConverter.ToString(byteValue).Replace("-", "");
+                        }
+                        if (formattedValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
                             return true;
                     }
                 }
