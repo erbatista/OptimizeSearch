@@ -138,49 +138,47 @@ namespace OptimizeSearch
 
         public IEnumerable<T> Search(string? searchString)
         {
-            if(searchString is null) return _items;
             if (string.IsNullOrEmpty(searchString)) return _items;
+
+            // Split search string by comma for multiple terms
+            var searchTerms = searchString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            if (searchTerms.Length == 0) return _items;
 
             var results = new HashSet<T>();
 
-            // Try parsing as int first
-            if (int.TryParse(searchString, out var intValue))
+            // Pre-filter using indexes for the first term
+            if (int.TryParse(searchTerms[0], out int intValue))
             {
-                lock (_intIndex)
+                if (_intIndex.TryGetValue(intValue, out var intMatches))
                 {
-                    if (_intIndex.TryGetValue(intValue, out var intMatches))
-                    {
-                        results.UnionWith(intMatches);
-                    }
+                    results.UnionWith(intMatches);
                 }
             }
 
-            // Search string index (includes byte[] as strings)
-            var stringTokens = searchString.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var stringTokens = searchTerms[0].Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             HashSet<T>? stringResults = null;
             foreach (var token in stringTokens)
             {
-                lock (_stringIndex)
+                if (_stringIndex.TryGetValue(token, out var tokenSet))
                 {
-                    if (_stringIndex.TryGetValue(token, out var tokenSet))
-                    {
-                        stringResults ??= new HashSet<T>(tokenSet);
-                        stringResults.IntersectWith(tokenSet);
-                    }
-                    else
-                    {
-                        stringResults = null;
-                        break;
-                    }
+                    stringResults ??= new HashSet<T>(tokenSet);
+                    stringResults.IntersectWith(tokenSet);
+                }
+                else
+                {
+                    stringResults = null;
+                    break;
                 }
             }
             if (stringResults != null)
                 results.UnionWith(stringResults);
 
-            // Final filter for exact matches
-            return results.Count > 0 
-                ? results.Where(item => ContainsMatch(item, searchString)) 
-                : _items.Where(item => ContainsMatch(item, searchString));
+            // If no pre-filter results, start with all items
+            if (results.Count == 0 && stringResults == null)
+                results.UnionWith(_items);
+
+            // Filter for all terms (exact matching)
+            return results.Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim()))); // Trim to remove extra spaces
         }
 
         private bool ContainsMatch(T? item, string searchString) =>
