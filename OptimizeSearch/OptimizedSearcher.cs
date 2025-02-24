@@ -1,8 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using System;
 
 namespace OptimizeSearch
 {
@@ -10,7 +10,6 @@ namespace OptimizeSearch
     {
         private readonly Dictionary<string, HashSet<T>> _stringIndex;
         private readonly Dictionary<int, HashSet<T>> _intIndex;
-        private readonly Dictionary<string, HashSet<T>> _byteArrayIndex; // Keys are MAC (6 bytes) or GUID (16 bytes) strings
         private readonly IEnumerable<T> _items;
 
         public OptimizedSearcher(IEnumerable<T> items)
@@ -18,7 +17,6 @@ namespace OptimizeSearch
             _items = items ?? throw new ArgumentNullException("items");
             _stringIndex = new Dictionary<string, HashSet<T>>(StringComparer.OrdinalIgnoreCase);
             _intIndex = new Dictionary<int, HashSet<T>>();
-            _byteArrayIndex = new Dictionary<string, HashSet<T>>(StringComparer.OrdinalIgnoreCase);
 
             BuildIndex();
         }
@@ -27,20 +25,20 @@ namespace OptimizeSearch
         {
             Parallel.ForEach(_items, item =>
             {
-                IndexItem(item, item.GetType());
+                IndexItem(item, item, item.GetType());
             });
         }
 
-        private void IndexItem(T item, Type type, HashSet<object> visited = null)
+        private void IndexItem(T parentItem, object currentItem, Type type, HashSet<object> visited = null)
         {
             if (visited == null) visited = new HashSet<object>();
-            if (item == null || visited.Contains(item)) return;
-            visited.Add(item);
+            if (currentItem == null || visited.Contains(currentItem)) return;
+            visited.Add(currentItem);
 
             var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
             foreach (var prop in properties)
             {
-                object value = prop.GetValue(item, null);
+                object value = prop.GetValue(currentItem, null);
                 if (value == null) continue;
 
                 Type propType = prop.PropertyType;
@@ -59,7 +57,7 @@ namespace OptimizeSearch
                                     set = new HashSet<T>();
                                     _stringIndex[word] = set;
                                 }
-                                set.Add(item);
+                                set.Add(parentItem);
                             }
                         }
                     }
@@ -75,7 +73,7 @@ namespace OptimizeSearch
                                 set = new HashSet<T>();
                                 _intIndex[intValue] = set;
                             }
-                            set.Add(item);
+                            set.Add(parentItem);
                         }
                     }
                 }
@@ -83,28 +81,32 @@ namespace OptimizeSearch
                 {
                     if (value is byte[] byteValue && byteValue.Length > 0)
                     {
-                        string key;
+                        string strValue;
                         if (byteValue.Length == 6) // MAC Address
                         {
-                            key = FormatMacAddress(byteValue);
+                            strValue = FormatMacAddress(byteValue);
                         }
                         else if (byteValue.Length == 16) // GUID
                         {
-                            key = new Guid(byteValue).ToString();
+                            strValue = new Guid(byteValue).ToString();
                         }
-                        else // Generic byte array
+                        else
                         {
-                            key = BitConverter.ToString(byteValue).Replace("-", "");
+                            throw new ArgumentException($"Unexpected byte[] length {byteValue.Length} for property {prop.Name}");
                         }
 
-                        lock (_byteArrayIndex)
+                        var words = strValue.Split(new[] { ' ', '-', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                        lock (_stringIndex)
                         {
-                            if (!_byteArrayIndex.TryGetValue(key, out var set))
+                            foreach (var word in words)
                             {
-                                set = new HashSet<T>();
-                                _byteArrayIndex[key] = set;
+                                if (!_stringIndex.TryGetValue(word, out var set))
+                                {
+                                    set = new HashSet<T>();
+                                    _stringIndex[word] = set;
+                                }
+                                set.Add(parentItem);
                             }
-                            set.Add(item);
                         }
                     }
                 }
@@ -116,14 +118,14 @@ namespace OptimizeSearch
                         {
                             if (element != null)
                             {
-                                IndexItem(item, element.GetType(), visited);
+                                IndexItem(parentItem, element, element.GetType(), visited);
                             }
                         }
                     }
                 }
                 else if (!propType.IsPrimitive && propType != typeof(object) && !propType.IsValueType && propType.IsClass)
                 {
-                    IndexItem(item, propType, visited);
+                    IndexItem(parentItem, value, propType, visited);
                 }
             }
         }
@@ -149,7 +151,7 @@ namespace OptimizeSearch
                 }
             }
 
-            // Search string index
+            // Search string index (includes byte[] as strings)
             var stringTokens = searchString.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             HashSet<T> stringResults = null;
             foreach (var token in stringTokens)
@@ -170,37 +172,24 @@ namespace OptimizeSearch
             if (stringResults != null)
                 results.UnionWith(stringResults);
 
-            // Search byte[] (MAC, GUID, or generic)
-            if (_byteArrayIndex.TryGetValue(searchString, out var byteMatches))
-            {
-                results.UnionWith(byteMatches);
-            }
-            else
-            {
-                foreach (var key in _byteArrayIndex.Keys.Where(k => k.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0))
-                {
-                    results.UnionWith(_byteArrayIndex[key]);
-                }
-            }
-
             // Final filter for exact matches
             return results.Count > 0 ? results.Where(item => ContainsMatch(item, searchString)) : _items.Where(item => ContainsMatch(item, searchString));
         }
 
         private bool ContainsMatch(T item, string searchString)
         {
-            return ContainsMatchRecursive(item, item.GetType(), searchString, new HashSet<object>());
+            return ContainsMatchRecursive(item, item, item.GetType(), searchString, new HashSet<object>());
         }
 
-        private bool ContainsMatchRecursive(object item, Type type, string searchString, HashSet<object> visited)
+        private bool ContainsMatchRecursive(T parentItem, object currentItem, Type type, string searchString, HashSet<object> visited)
         {
-            if (item == null || visited.Contains(item)) return false;
-            visited.Add(item);
+            if (currentItem == null || visited.Contains(currentItem)) return false;
+            visited.Add(currentItem);
 
             var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
             foreach (var prop in properties)
             {
-                object value = prop.GetValue(item, null);
+                object value = prop.GetValue(currentItem, null);
                 if (value == null) continue;
 
                 Type propType = prop.PropertyType;
@@ -228,9 +217,9 @@ namespace OptimizeSearch
                         {
                             formattedValue = new Guid(byteValue).ToString();
                         }
-                        else // Generic byte array
+                        else
                         {
-                            formattedValue = BitConverter.ToString(byteValue).Replace("-", "");
+                            throw new ArgumentException($"Unexpected byte[] length {byteValue.Length} for property {prop.Name}");
                         }
                         if (formattedValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
                             return true;
@@ -242,14 +231,14 @@ namespace OptimizeSearch
                     {
                         foreach (var element in enumerable)
                         {
-                            if (element != null && ContainsMatchRecursive(element, element.GetType(), searchString, visited))
+                            if (element != null && ContainsMatchRecursive(parentItem, element, element.GetType(), searchString, visited))
                                 return true;
                         }
                     }
                 }
                 else if (!propType.IsPrimitive && propType != typeof(object) && !propType.IsValueType && propType.IsClass)
                 {
-                    if (ContainsMatchRecursive(value, propType, searchString, visited))
+                    if (ContainsMatchRecursive(parentItem, value, propType, searchString, visited))
                         return true;
                 }
             }
