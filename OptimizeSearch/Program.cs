@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace OptimizeSearch
 {
-    // Example Usage with Complex Properties
+    // Example Usage
     public abstract class BaseItem
     {
         public string CommonProperty { get; set; }
@@ -13,21 +14,15 @@ namespace OptimizeSearch
     {
         public string Details { get; set; }
         public int Number { get; set; }
-        public byte[] ExtraData { get; set; }
+        public byte[] MacAddress { get; set; } // Always 6 bytes
+        public byte[] GuidBytes { get; set; } // Always 16 bytes
     }
 
     public class MyItemA : BaseItem
     {
         public string Name { get; set; }
         public int Value { get; set; }
-        public ComplexData ComplexProperty { get; set; }
-    }
-
-    public class MyItemB : BaseItem
-    {
-        public byte[] Data { get; set; }
-        public string Description { get; set; }
-        public ComplexData NestedComplex { get; set; }
+        public List<ComplexData> ComplexList { get; set; }
     }
 
     class Program
@@ -41,25 +36,31 @@ namespace OptimizeSearch
                     CommonProperty = "Shared",
                     Name = "Apple",
                     Value = 42,
-                    ComplexProperty = new ComplexData { Details = "Tasty", Number = 100, ExtraData = new byte[] { 0xDE, 0xAD } }
-                },
-                new MyItemB
-                {
-                    CommonProperty = "Shared",
-                    Data = new byte[] { 0xCA, 0xFE },
-                    Description = "Cafe",
-                    NestedComplex = new ComplexData { Details = "Rich", Number = 200, ExtraData = new byte[] { 0xBE, 0xEF } }
+                    ComplexList = new List<ComplexData>
+                    {
+                        new ComplexData
+                        {
+                            Details = "Tasty",
+                            Number = 100,
+                            MacAddress = new byte[] { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 },
+                            GuidBytes = Guid.Parse("550e8400-e29b-41d4-a716-446655440000").ToByteArray()
+                        },
+                        new ComplexData
+                        {
+                            Details = "Crisp",
+                            Number = 50,
+                            MacAddress = new byte[] { 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF }
+                        }
+                    }
                 }
             };
 
             var searcher = new OptimizedSearcher<BaseItem>(items);
-            var results = searcher.Search("Tasty");
+            var results = searcher.Search("00:11");
             foreach (var item in results)
             {
                 if (item is MyItemA a)
-                    Console.WriteLine($"MyItemA: {a.Name} - {a.ComplexProperty.Details}");
-                else if (item is MyItemB b)
-                    Console.WriteLine($"MyItemB: {b.Description} - {b.NestedComplex.Details}");
+                    Console.WriteLine($"MyItemA: {a.Name} - {string.Join(", ", a.ComplexList.Select(c => c.Details))}");
             }
         }
     }
