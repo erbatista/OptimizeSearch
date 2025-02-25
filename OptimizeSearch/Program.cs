@@ -63,7 +63,7 @@ namespace OptimizeSearch
         };
 
             var searcher = new OptimizedSearcher<BaseItem>(items);
-            var results = searcher.Search("Tasty,00:11"); // Must match both "Tasty" and "00:11"
+            var results = searcher.Search("Tasty,00:11", useAndCondition: true);
             foreach (var item in results)
             {
                 if (item is MyItemA a)
