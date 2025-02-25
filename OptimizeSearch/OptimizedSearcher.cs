@@ -1,10 +1,9 @@
 ﻿#nullable enable
-
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
-using System;
 
 namespace OptimizeSearch
 {
@@ -27,28 +26,23 @@ namespace OptimizeSearch
         {
             Parallel.ForEach(_items, item =>
             {
-                if (item is not null)
-                {
-                    IndexItem(item, item, item.GetType());
-                }
+                IndexItem(item, item, item.GetType());
             });
         }
 
-        private void IndexItem(T parentItem, 
-            object? currentItem, 
-            Type type, 
-            HashSet<object>? visited = null)
+        private void IndexItem(T parentItem, object? currentItem, Type type, HashSet<object>? visited = null)
         {
             visited ??= new HashSet<object>();
-            if (currentItem == null || !visited.Add(currentItem)) return;
+            if (currentItem == null || visited.Contains(currentItem)) return;
+            visited.Add(currentItem);
 
             var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
             foreach (var prop in properties)
             {
-                var value = prop.GetValue(currentItem, null);
+                object? value = prop.GetValue(currentItem, null);
                 if (value == null) continue;
 
-                var propType = prop.PropertyType;
+                Type propType = prop.PropertyType;
 
                 if (propType == typeof(string))
                 {
@@ -88,9 +82,9 @@ namespace OptimizeSearch
                 {
                     if (value is byte[] byteValue && byteValue.Length > 0)
                     {
-                        var strValue = byteValue.Length switch
+                        string strValue = byteValue.Length switch
                         {
-                            <= 6 => FormatMacAddress(byteValue),
+                            6 => FormatMacAddress(byteValue),
                             16 => new Guid(byteValue).ToString(),
                             _ => throw new ArgumentException($"Unexpected byte[] length {byteValue.Length} for property {prop.Name}")
                         };
@@ -132,11 +126,11 @@ namespace OptimizeSearch
 
         private string FormatMacAddress(byte[] bytes)
         {
-            if (bytes.Length > 6) throw new ArgumentException("MAC address must be 6 bytes.");
+            if (bytes.Length != 6) throw new ArgumentException("MAC address must be 6 bytes.");
             return string.Join(":", bytes.Select(b => b.ToString("X2")));
         }
 
-        public IEnumerable<T> Search(string? searchString)
+        public IEnumerable<T> Search(string? searchString, bool useAndCondition = true)
         {
             if (string.IsNullOrEmpty(searchString)) return _items;
 
@@ -146,72 +140,131 @@ namespace OptimizeSearch
 
             var results = new HashSet<T>();
 
-            // Pre-filter using indexes for the first term
-            if (int.TryParse(searchTerms[0], out int intValue))
+            if (useAndCondition)
             {
-                if (_intIndex.TryGetValue(intValue, out var intMatches))
+                // AND: Intersect results for all terms
+                bool firstTerm = true;
+                foreach (var term in searchTerms)
                 {
-                    results.UnionWith(intMatches);
+                    var termResults = new HashSet<T>();
+
+                    if (int.TryParse(term, out int intValue))
+                    {
+                        if (_intIndex.TryGetValue(intValue, out var intMatches))
+                        {
+                            termResults.UnionWith(intMatches);
+                        }
+                    }
+
+                    var stringTokens = term.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    HashSet<T>? stringResults = null;
+                    foreach (var token in stringTokens)
+                    {
+                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        {
+                            stringResults ??= new HashSet<T>(tokenSet);
+                            stringResults.IntersectWith(tokenSet);
+                        }
+                        else
+                        {
+                            stringResults = null;
+                            break;
+                        }
+                    }
+                    if (stringResults != null)
+                        termResults.UnionWith(stringResults);
+
+                    if (termResults.Count == 0)
+                        return Enumerable.Empty<T>(); // No matches for this term, short-circuit AND
+
+                    if (firstTerm)
+                    {
+                        results.UnionWith(termResults);
+                        firstTerm = false;
+                    }
+                    else
+                    {
+                        results.IntersectWith(termResults); // Narrow down to items matching all terms
+                    }
                 }
             }
-
-            var stringTokens = searchTerms[0].Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            HashSet<T>? stringResults = null;
-            foreach (var token in stringTokens)
+            else
             {
-                if (_stringIndex.TryGetValue(token, out var tokenSet))
+                // OR: Union results for any term
+                foreach (var term in searchTerms)
                 {
-                    stringResults ??= new HashSet<T>(tokenSet);
-                    stringResults.IntersectWith(tokenSet);
+                    if (int.TryParse(term, out int intValue))
+                    {
+                        if (_intIndex.TryGetValue(intValue, out var intMatches))
+                        {
+                            results.UnionWith(intMatches);
+                        }
+                    }
+
+                    var stringTokens = term.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    HashSet<T>? stringResults = null;
+                    foreach (var token in stringTokens)
+                    {
+                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        {
+                            stringResults ??= new HashSet<T>(tokenSet);
+                            stringResults.IntersectWith(tokenSet);
+                        }
+                        else
+                        {
+                            stringResults = null;
+                            break;
+                        }
+                    }
+                    if (stringResults != null)
+                        results.UnionWith(stringResults);
                 }
-                else
-                {
-                    stringResults = null;
-                    break;
-                }
+
+                // If no pre-filter matches, start with all items
+                if (results.Count == 0)
+                    results.UnionWith(_items);
             }
-            if (stringResults != null)
-                results.UnionWith(stringResults);
 
-            // If no pre-filter results, start with all items
-            if (results.Count == 0 && stringResults == null)
-                results.UnionWith(_items);
-
-            // Filter for all terms (exact matching)
-            return results.Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim()))); // Trim to remove extra spaces
+            // Final filter for exact matches
+            return results.Where(item => useAndCondition
+                ? searchTerms.All(term => ContainsMatch(item, term.Trim()))
+                : searchTerms.Any(term => ContainsMatch(item, term.Trim())));
         }
 
-        private bool ContainsMatch(T? item, string searchString) =>
-            item is not null 
-            && ContainsMatchRecursive(item, item, item.GetType(), searchString, new HashSet<object>());
-
-        private bool ContainsMatchRecursive(T parentItem, object? currentItem, Type type, string? searchString, HashSet<object> visited)
+        private bool ContainsMatch(T item, string? searchString)
         {
-            if (currentItem == null || !visited.Add(currentItem)) return false;
+            if (string.IsNullOrEmpty(searchString)) return true; // Empty term matches everything
+            return ContainsMatchRecursive(item, item, item.GetType(), searchString, new HashSet<object>());
+        }
+
+        private bool ContainsMatchRecursive(T parentItem, object? currentItem, Type type, string searchString, HashSet<object> visited)
+        {
+            if (currentItem == null || visited.Contains(currentItem)) return false;
+            visited.Add(currentItem);
 
             var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
             foreach (var prop in properties)
             {
-                var value = prop.GetValue(currentItem, null);
+                object? value = prop.GetValue(currentItem, null);
                 if (value == null) continue;
 
-                var propType = prop.PropertyType;
+                Type propType = prop.PropertyType;
 
                 if (propType == typeof(string))
                 {
-                    if (value is string strValue && strValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (value is string strValue && strValue != null && strValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
                         return true;
                 }
                 else if (propType == typeof(int))
                 {
-                    if (int.TryParse(searchString, out var intSearch) && value is int intValue && intValue == intSearch)
+                    if (int.TryParse(searchString, out int intSearch) && value is int intValue && intValue == intSearch)
                         return true;
                 }
                 else if (propType == typeof(byte[]))
                 {
-                    if (value is byte[] byteValue)
+                    if (value is byte[] byteValue && byteValue != null)
                     {
-                        var formattedValue = byteValue.Length switch
+                        string formattedValue = byteValue.Length switch
                         {
                             6 => FormatMacAddress(byteValue),
                             16 => new Guid(byteValue).ToString(),
