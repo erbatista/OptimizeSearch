@@ -136,7 +136,7 @@ namespace OptimizeSearch
             return string.Join(":", bytes.Select(b => b.ToString("X2")));
         }
 
-        public IEnumerable<T> Search(string? searchString)
+        public IEnumerable<T> Search(string? searchString, bool useAndCondition = true)
         {
             if (string.IsNullOrEmpty(searchString)) return _items;
 
@@ -177,8 +177,10 @@ namespace OptimizeSearch
             if (results.Count == 0 && stringResults == null)
                 results.UnionWith(_items);
 
-            // Filter for all terms (exact matching)
-            return results.Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim()))); // Trim to remove extra spaces
+            // Filter based on AND or OR condition
+            return results.Where(item => useAndCondition
+                ? searchTerms.All(term => ContainsMatch(item, term.Trim()))  // AND: All terms must match
+                : searchTerms.Any(term => ContainsMatch(item, term.Trim()))); // OR: At least one term must match
         }
 
         private bool ContainsMatch(T item, string? searchString)
