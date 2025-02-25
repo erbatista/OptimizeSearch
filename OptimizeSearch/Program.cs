@@ -146,41 +146,95 @@ namespace OptimizeSearch
 
             var results = new HashSet<T>();
 
-            // Pre-filter using indexes for the first term
-            if (int.TryParse(searchTerms[0], out int intValue))
+            if (useAndCondition)
             {
-                if (_intIndex.TryGetValue(intValue, out var intMatches))
+                // AND: Intersect results for all terms
+                bool firstTerm = true;
+                foreach (var term in searchTerms)
                 {
-                    results.UnionWith(intMatches);
+                    var termResults = new HashSet<T>();
+
+                    if (int.TryParse(term, out int intValue))
+                    {
+                        if (_intIndex.TryGetValue(intValue, out var intMatches))
+                        {
+                            termResults.UnionWith(intMatches);
+                        }
+                    }
+
+                    var stringTokens = term.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    HashSet<T>? stringResults = null;
+                    foreach (var token in stringTokens)
+                    {
+                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        {
+                            stringResults ??= new HashSet<T>(tokenSet);
+                            stringResults.IntersectWith(tokenSet);
+                        }
+                        else
+                        {
+                            stringResults = null;
+                            break;
+                        }
+                    }
+                    if (stringResults != null)
+                        termResults.UnionWith(stringResults);
+
+                    if (termResults.Count == 0)
+                        return Enumerable.Empty<T>(); // No matches for this term, short-circuit AND
+
+                    if (firstTerm)
+                    {
+                        results.UnionWith(termResults);
+                        firstTerm = false;
+                    }
+                    else
+                    {
+                        results.IntersectWith(termResults); // Narrow down to items matching all terms
+                    }
                 }
             }
-
-            var stringTokens = searchTerms[0].Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            HashSet<T>? stringResults = null;
-            foreach (var token in stringTokens)
+            else
             {
-                if (_stringIndex.TryGetValue(token, out var tokenSet))
+                // OR: Union results for any term
+                foreach (var term in searchTerms)
                 {
-                    stringResults ??= new HashSet<T>(tokenSet);
-                    stringResults.IntersectWith(tokenSet);
+                    if (int.TryParse(term, out int intValue))
+                    {
+                        if (_intIndex.TryGetValue(intValue, out var intMatches))
+                        {
+                            results.UnionWith(intMatches);
+                        }
+                    }
+
+                    var stringTokens = term.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    HashSet<T>? stringResults = null;
+                    foreach (var token in stringTokens)
+                    {
+                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        {
+                            stringResults ??= new HashSet<T>(tokenSet);
+                            stringResults.IntersectWith(tokenSet);
+                        }
+                        else
+                        {
+                            stringResults = null;
+                            break;
+                        }
+                    }
+                    if (stringResults != null)
+                        results.UnionWith(stringResults);
                 }
-                else
-                {
-                    stringResults = null;
-                    break;
-                }
+
+                // If no pre-filter matches, start with all items
+                if (results.Count == 0)
+                    results.UnionWith(_items);
             }
-            if (stringResults != null)
-                results.UnionWith(stringResults);
 
-            // If no pre-filter results, start with all items
-            if (results.Count == 0 && stringResults == null)
-                results.UnionWith(_items);
-
-            // Filter based on AND or OR condition
+            // Final filter for exact matches
             return results.Where(item => useAndCondition
-                ? searchTerms.All(term => ContainsMatch(item, term.Trim()))  // AND: All terms must match
-                : searchTerms.Any(term => ContainsMatch(item, term.Trim()))); // OR: At least one term must match
+                ? searchTerms.All(term => ContainsMatch(item, term.Trim()))
+                : searchTerms.Any(term => ContainsMatch(item, term.Trim())));
         }
 
         private bool ContainsMatch(T item, string? searchString)
