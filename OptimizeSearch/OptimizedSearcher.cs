@@ -9,6 +9,7 @@
     using System.Text;
     using System.Threading.Tasks;
 
+
     public class OptimizedSearcher<T>
     {
         private readonly Dictionary<string, HashSet<T>> _stringIndex;
@@ -65,7 +66,7 @@
                 }
                 else if (propType == typeof(int) || propType == typeof(uint) || propType == typeof(double))
                 {
-                    string strValue = value.ToString()!; // Convert int, uint, or double to string
+                    string strValue = value.ToString()!;
                     lock (_stringIndex)
                     {
                         if (!_stringIndex.TryGetValue(strValue, out var set))
@@ -198,25 +199,78 @@
 
             var results = new HashSet<T>();
 
-            foreach (var term in searchTerms)
+            if (useAndCondition)
             {
-                var trimmedTerm = term.Trim();
-                var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var token in stringTokens)
+                // AND: Intersect sets for each term
+                bool firstTerm = true;
+                foreach (var term in searchTerms)
                 {
-                    if (_stringIndex.TryGetValue(token, out var tokenSet))
+                    var trimmedTerm = term.Trim();
+                    var termResults = new HashSet<T>();
+
+                    // Split term into tokens and union all matches
+                    var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    bool hasMatches = false;
+                    foreach (var token in stringTokens)
                     {
-                        results.UnionWith(tokenSet);
+                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        {
+                            termResults.UnionWith(tokenSet);
+                            hasMatches = true;
+                        }
+                    }
+
+                    // Add exact term match (e.g., "3.14" or "00:11")
+                    if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
+                    {
+                        termResults.UnionWith(exactSet);
+                        hasMatches = true;
+                    }
+
+                    if (!hasMatches)
+                        return Enumerable.Empty<T>(); // No matches for this term, short-circuit AND
+
+                    if (firstTerm)
+                    {
+                        results.UnionWith(termResults);
+                        firstTerm = false;
+                    }
+                    else
+                    {
+                        results.IntersectWith(termResults); // Narrow to items matching all terms so far
                     }
                 }
+
+                // Final exact substring check
+                return results.Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim())));
             }
+            else
+            {
+                // OR: Union all matches across terms
+                foreach (var term in searchTerms)
+                {
+                    var trimmedTerm = term.Trim();
+                    var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var token in stringTokens)
+                    {
+                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        {
+                            results.UnionWith(tokenSet);
+                        }
+                    }
 
-            if (results.Count == 0)
-                results.UnionWith(_items);
+                    // Include exact term match
+                    if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
+                    {
+                        results.UnionWith(exactSet);
+                    }
+                }
 
-            return results.Where(item => useAndCondition
-                ? searchTerms.All(term => ContainsMatch(item, term.Trim()))
-                : searchTerms.Any(term => ContainsMatch(item, term.Trim())));
+                if (results.Count == 0)
+                    results.UnionWith(_items);
+
+                return results.Where(item => searchTerms.Any(term => ContainsMatch(item, term.Trim())));
+            }
         }
 
         private bool ContainsMatch(T item, string? searchString)
