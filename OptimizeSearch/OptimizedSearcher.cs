@@ -1,23 +1,23 @@
-﻿#nullable enable
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Threading.Tasks;
-
-namespace OptimizeSearch
+﻿namespace OptimizeSearch
 {
+#nullable enable
+
+    using System;
+    using System.Collections.Generic;
+    using System.Linq;
+    using System.Reflection;
+    using System.Text;
+    using System.Threading.Tasks;
+
     public class OptimizedSearcher<T>
     {
         private readonly Dictionary<string, HashSet<T>> _stringIndex;
-        private readonly Dictionary<int, HashSet<T>> _intIndex;
         private readonly IEnumerable<T> _items;
 
         public OptimizedSearcher(IEnumerable<T> items)
         {
             _items = items ?? throw new ArgumentNullException(nameof(items));
             _stringIndex = new Dictionary<string, HashSet<T>>(StringComparer.OrdinalIgnoreCase);
-            _intIndex = new Dictionary<int, HashSet<T>>();
 
             BuildIndex();
         }
@@ -63,19 +63,17 @@ namespace OptimizeSearch
                         }
                     }
                 }
-                else if (propType == typeof(int))
+                else if (propType == typeof(int) || propType == typeof(uint) || propType == typeof(double))
                 {
-                    if (value is int intValue)
+                    string strValue = value.ToString()!; // Convert int, uint, or double to string
+                    lock (_stringIndex)
                     {
-                        lock (_intIndex)
+                        if (!_stringIndex.TryGetValue(strValue, out var set))
                         {
-                            if (!_intIndex.TryGetValue(intValue, out var set))
-                            {
-                                set = new HashSet<T>();
-                                _intIndex[intValue] = set;
-                            }
-                            set.Add(parentItem);
+                            set = new HashSet<T>();
+                            _stringIndex[strValue] = set;
                         }
+                        set.Add(parentItem);
                     }
                 }
                 else if (propType == typeof(byte[]))
@@ -110,9 +108,70 @@ namespace OptimizeSearch
                     {
                         foreach (var element in enumerable)
                         {
-                            if (element != null)
+                            if (element == null) continue;
+
+                            Type elementType = element.GetType();
+                            if (elementType == typeof(string))
                             {
-                                IndexItem(parentItem, element, element.GetType(), visited);
+                                if (element is string strElement && !string.IsNullOrEmpty(strElement))
+                                {
+                                    var words = strElement.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                                    lock (_stringIndex)
+                                    {
+                                        foreach (var word in words)
+                                        {
+                                            if (!_stringIndex.TryGetValue(word, out var set))
+                                            {
+                                                set = new HashSet<T>();
+                                                _stringIndex[word] = set;
+                                            }
+                                            set.Add(parentItem);
+                                        }
+                                    }
+                                }
+                            }
+                            else if (elementType == typeof(int) || elementType == typeof(uint) || elementType == typeof(double))
+                            {
+                                string strElement = element.ToString()!;
+                                lock (_stringIndex)
+                                {
+                                    if (!_stringIndex.TryGetValue(strElement, out var set))
+                                    {
+                                        set = new HashSet<T>();
+                                        _stringIndex[strElement] = set;
+                                    }
+                                    set.Add(parentItem);
+                                }
+                            }
+                            else if (elementType == typeof(byte[]))
+                            {
+                                if (element is byte[] byteElement && byteElement.Length > 0)
+                                {
+                                    string strElement = byteElement.Length switch
+                                    {
+                                        6 => FormatMacAddress(byteElement),
+                                        16 => new Guid(byteElement).ToString(),
+                                        _ => throw new ArgumentException($"Unexpected byte[] length {byteElement.Length}")
+                                    };
+
+                                    var words = strElement.Split(new[] { ' ', '-', ':' }, StringSplitOptions.RemoveEmptyEntries);
+                                    lock (_stringIndex)
+                                    {
+                                        foreach (var word in words)
+                                        {
+                                            if (!_stringIndex.TryGetValue(word, out var set))
+                                            {
+                                                set = new HashSet<T>();
+                                                _stringIndex[word] = set;
+                                            }
+                                            set.Add(parentItem);
+                                        }
+                                    }
+                                }
+                            }
+                            else if (!elementType.IsPrimitive && elementType != typeof(object) && !elementType.IsValueType && elementType.IsClass)
+                            {
+                                IndexItem(parentItem, element, elementType, visited);
                             }
                         }
                     }
@@ -142,15 +201,6 @@ namespace OptimizeSearch
             foreach (var term in searchTerms)
             {
                 var trimmedTerm = term.Trim();
-
-                if (int.TryParse(trimmedTerm, out int intValue))
-                {
-                    if (_intIndex.TryGetValue(intValue, out var intMatches))
-                    {
-                        results.UnionWith(intMatches);
-                    }
-                }
-
                 var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 foreach (var token in stringTokens)
                 {
@@ -193,9 +243,9 @@ namespace OptimizeSearch
                     if (value is string strValue && strValue != null && strValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
                         return true;
                 }
-                else if (propType == typeof(int))
+                else if (propType == typeof(int) || propType == typeof(uint) || propType == typeof(double))
                 {
-                    if (int.TryParse(searchString, out int intSearch) && value is int intValue && intValue == intSearch)
+                    if (value.ToString() is string strValue && strValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
                         return true;
                 }
                 else if (propType == typeof(byte[]))
@@ -218,8 +268,38 @@ namespace OptimizeSearch
                     {
                         foreach (var element in enumerable)
                         {
-                            if (element != null && ContainsMatchRecursive(parentItem, element, element.GetType(), searchString, visited))
-                                return true;
+                            if (element == null) continue;
+
+                            Type elementType = element.GetType();
+                            if (elementType == typeof(string))
+                            {
+                                if (element is string strElement && strElement != null && strElement.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
+                                    return true;
+                            }
+                            else if (elementType == typeof(int) || elementType == typeof(uint) || elementType == typeof(double))
+                            {
+                                if (element.ToString() is string strElement && strElement.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
+                                    return true;
+                            }
+                            else if (elementType == typeof(byte[]))
+                            {
+                                if (element is byte[] byteElement && byteElement != null)
+                                {
+                                    string formattedElement = byteElement.Length switch
+                                    {
+                                        6 => FormatMacAddress(byteElement),
+                                        16 => new Guid(byteElement).ToString(),
+                                        _ => throw new ArgumentException($"Unexpected byte[] length {byteElement.Length}")
+                                    };
+                                    if (formattedElement.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
+                                        return true;
+                                }
+                            }
+                            else if (!elementType.IsPrimitive && elementType != typeof(object) && !elementType.IsValueType && elementType.IsClass)
+                            {
+                                if (ContainsMatchRecursive(parentItem, element, elementType, searchString, visited))
+                                    return true;
+                            }
                         }
                     }
                 }
