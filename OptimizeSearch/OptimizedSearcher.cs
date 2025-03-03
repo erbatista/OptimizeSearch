@@ -9,7 +9,6 @@
     using System.Text;
     using System.Threading.Tasks;
 
-
     public class OptimizedSearcher<T>
     {
         private readonly Dictionary<string, HashSet<T>> _stringIndex;
@@ -51,9 +50,18 @@
                 {
                     if (value is string strValue && !string.IsNullOrEmpty(strValue))
                     {
-                        var words = strValue.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                         lock (_stringIndex)
                         {
+                            // Index full value
+                            if (!_stringIndex.TryGetValue(strValue, out var fullSet))
+                            {
+                                fullSet = new HashSet<T>();
+                                _stringIndex[strValue] = fullSet;
+                            }
+                            fullSet.Add(parentItem);
+
+                            // Index tokens
+                            var words = strValue.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                             foreach (var word in words)
                             {
                                 if (!_stringIndex.TryGetValue(word, out var set))
@@ -79,6 +87,17 @@
                             }
                             set.Add(parentItem);
                         }
+                        // Also index as string for partial matching
+                        string strValue = intValue.ToString();
+                        lock (_stringIndex)
+                        {
+                            if (!_stringIndex.TryGetValue(strValue, out var strSet))
+                            {
+                                strSet = new HashSet<T>();
+                                _stringIndex[strValue] = strSet;
+                            }
+                            strSet.Add(parentItem);
+                        }
                     }
                 }
                 else if (propType == typeof(byte[]))
@@ -92,9 +111,18 @@
                             _ => throw new ArgumentException($"Unexpected byte[] length {byteValue.Length} for property {prop.Name}")
                         };
 
-                        var words = strValue.Split(new[] { ' ', '-', ':' }, StringSplitOptions.RemoveEmptyEntries);
                         lock (_stringIndex)
                         {
+                            // Index full value
+                            if (!_stringIndex.TryGetValue(strValue, out var fullSet))
+                            {
+                                fullSet = new HashSet<T>();
+                                _stringIndex[strValue] = fullSet;
+                            }
+                            fullSet.Add(parentItem);
+
+                            // Index tokens
+                            var words = strValue.Split(new[] { ' ', '-', ':' }, StringSplitOptions.RemoveEmptyEntries);
                             foreach (var word in words)
                             {
                                 if (!_stringIndex.TryGetValue(word, out var set))
@@ -120,9 +148,16 @@
                             {
                                 if (element is string strElement && !string.IsNullOrEmpty(strElement))
                                 {
-                                    var words = strElement.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                                     lock (_stringIndex)
                                     {
+                                        if (!_stringIndex.TryGetValue(strElement, out var fullSet))
+                                        {
+                                            fullSet = new HashSet<T>();
+                                            _stringIndex[strElement] = fullSet;
+                                        }
+                                        fullSet.Add(parentItem);
+
+                                        var words = strElement.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                                         foreach (var word in words)
                                         {
                                             if (!_stringIndex.TryGetValue(word, out var set))
@@ -148,6 +183,16 @@
                                         }
                                         set.Add(parentItem);
                                     }
+                                    string strElement = intElement.ToString();
+                                    lock (_stringIndex)
+                                    {
+                                        if (!_stringIndex.TryGetValue(strElement, out var strSet))
+                                        {
+                                            strSet = new HashSet<T>();
+                                            _stringIndex[strElement] = strSet;
+                                        }
+                                        strSet.Add(parentItem);
+                                    }
                                 }
                             }
                             else if (elementType == typeof(byte[]))
@@ -161,9 +206,16 @@
                                         _ => throw new ArgumentException($"Unexpected byte[] length {byteElement.Length}")
                                     };
 
-                                    var words = strElement.Split(new[] { ' ', '-', ':' }, StringSplitOptions.RemoveEmptyEntries);
                                     lock (_stringIndex)
                                     {
+                                        if (!_stringIndex.TryGetValue(strElement, out var fullSet))
+                                        {
+                                            fullSet = new HashSet<T>();
+                                            _stringIndex[strElement] = fullSet;
+                                        }
+                                        fullSet.Add(parentItem);
+
+                                        var words = strElement.Split(new[] { ' ', '-', ':' }, StringSplitOptions.RemoveEmptyEntries);
                                         foreach (var word in words)
                                         {
                                             if (!_stringIndex.TryGetValue(word, out var set))
@@ -178,7 +230,6 @@
                             }
                             else if (!elementType.IsPrimitive && elementType != typeof(object) && !elementType.IsValueType && elementType.IsClass)
                             {
-                                // Only recurse into complex types
                                 IndexItem(parentItem, element, elementType, visited);
                             }
                         }
@@ -206,34 +257,105 @@
 
             var results = new HashSet<T>();
 
-            foreach (var term in searchTerms)
+            if (useAndCondition)
             {
-                var trimmedTerm = term.Trim();
-
-                if (int.TryParse(trimmedTerm, out int intValue))
+                bool firstTerm = true;
+                foreach (var term in searchTerms)
                 {
-                    if (_intIndex.TryGetValue(intValue, out var intMatches))
+                    var trimmedTerm = term.Trim();
+                    var termResults = new HashSet<T>();
+                    bool hasMatches = false;
+
+                    // Try exact int match first
+                    if (int.TryParse(trimmedTerm, out int intValue))
                     {
-                        results.UnionWith(intMatches);
+                        if (_intIndex.TryGetValue(intValue, out var intMatches))
+                        {
+                            termResults.UnionWith(intMatches);
+                            hasMatches = true;
+                        }
+                    }
+
+                    // Check full term and tokens in string index
+                    if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
+                    {
+                        termResults.UnionWith(exactSet);
+                        hasMatches = true;
+                    }
+
+                    var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var token in stringTokens)
+                    {
+                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        {
+                            termResults.UnionWith(tokenSet);
+                            hasMatches = true;
+                        }
+                    }
+
+                    if (!hasMatches)
+                        return Enumerable.Empty<T>(); // Short-circuit if no matches for this term
+
+                    if (firstTerm)
+                    {
+                        results.UnionWith(termResults);
+                        firstTerm = false;
+                    }
+                    else
+                    {
+                        results.IntersectWith(termResults); // Narrow down results
                     }
                 }
 
-                var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (var token in stringTokens)
-                {
-                    if (_stringIndex.TryGetValue(token, out var tokenSet))
-                    {
-                        results.UnionWith(tokenSet);
-                    }
-                }
+                // Minimal final check for substring matches
+                return results.Where(item => searchTerms.All(term => MatchesItem(item, term.Trim())));
             }
+            else
+            {
+                foreach (var term in searchTerms)
+                {
+                    var trimmedTerm = term.Trim();
 
-            if (results.Count == 0)
-                results.UnionWith(_items);
+                    if (int.TryParse(trimmedTerm, out int intValue))
+                    {
+                        if (_intIndex.TryGetValue(intValue, out var intMatches))
+                        {
+                            results.UnionWith(intMatches);
+                        }
+                    }
 
-            return results.Where(item => useAndCondition
-                ? searchTerms.All(term => ContainsMatch(item, term.Trim()))
-                : searchTerms.Any(term => ContainsMatch(item, term.Trim())));
+                    if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
+                    {
+                        results.UnionWith(exactSet);
+                    }
+
+                    var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var token in stringTokens)
+                    {
+                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        {
+                            results.UnionWith(tokenSet);
+                        }
+                    }
+                }
+
+                if (results.Count == 0)
+                    results.UnionWith(_items);
+
+                return results.Where(item => searchTerms.Any(term => MatchesItem(item, term.Trim())));
+            }
+        }
+
+        private bool MatchesItem(T item, string searchString)
+        {
+            // Check if the exact term matches any indexed value directly
+            if (_stringIndex.ContainsKey(searchString) && _stringIndex[searchString].Contains(item))
+                return true;
+            if (int.TryParse(searchString, out int intValue) && _intIndex.ContainsKey(intValue) && _intIndex[intValue].Contains(item))
+                return true;
+
+            // Fallback to full substring check if needed
+            return ContainsMatch(item, searchString);
         }
 
         private bool ContainsMatch(T item, string? searchString)
