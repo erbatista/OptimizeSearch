@@ -101,12 +101,7 @@
                 {
                     if (value is byte[] byteValue && byteValue.Length > 0)
                     {
-                        string strValue = byteValue.Length switch
-                        {
-                            6 => FormatMacAddress(byteValue),
-                            16 => new Guid(byteValue).ToString(),
-                            _ => throw new ArgumentException($"Unexpected byte[] length {byteValue.Length} for property {prop.Name}")
-                        };
+                        string strValue = FormatByteArray(byteValue, prop.Name);
 
                         lock (_stringIndex)
                         {
@@ -194,12 +189,7 @@
                             {
                                 if (element is byte[] byteElement && byteElement.Length > 0)
                                 {
-                                    string strElement = byteElement.Length switch
-                                    {
-                                        6 => FormatMacAddress(byteElement),
-                                        16 => new Guid(byteElement).ToString(),
-                                        _ => throw new ArgumentException($"Unexpected byte[] length {byteElement.Length}")
-                                    };
+                                    string strElement = FormatByteArray(byteElement, nameof(element));
 
                                     lock (_stringIndex)
                                     {
@@ -243,94 +233,104 @@
             return string.Join(":", bytes.Select(b => b.ToString("X2")));
         }
 
-        public IEnumerable<T> Search(string? searchString, bool useAndCondition = true)
+        private string FormatByteArray(byte[] byteValue, string propertyName)
         {
-            if (string.IsNullOrEmpty(searchString)) return _items;
-
-            var searchTerms = searchString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            if (searchTerms.Length == 0) return _items;
-
-            var results = new HashSet<T>();
-
-            if (useAndCondition)
+            return byteValue.Length switch
             {
-                bool firstTerm = true;
-                foreach (var term in searchTerms)
+                6 => FormatMacAddress(byteValue),
+                16 => new Guid(byteValue).ToString(),
+                _ => BitConverter.ToString(byteValue).Replace("-", "")
+            };
+        }
+
+        public async Task<IEnumerable<T>> SearchAsync(string? searchString, bool useAndCondition = true)
+        {
+            return await Task.Run(() =>
+            {
+                if (string.IsNullOrEmpty(searchString)) return _items;
+
+                var searchTerms = searchString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                if (searchTerms.Length == 0) return _items;
+
+                var results = new HashSet<T>();
+
+                if (useAndCondition)
                 {
-                    var trimmedTerm = term.Trim();
-                    var termResults = new HashSet<T>();
-
-                    // Try exact int match
-                    if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
+                    bool firstTerm = true;
+                    foreach (var term in searchTerms)
                     {
-                        termResults.UnionWith(intMatches);
-                    }
+                        var trimmedTerm = term.Trim();
+                        var termResults = new HashSet<T>();
 
-                    // Check string index for full term and tokens
-                    if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
-                    {
-                        termResults.UnionWith(exactSet);
-                    }
-
-                    var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var token in stringTokens)
-                    {
-                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
                         {
-                            termResults.UnionWith(tokenSet);
+                            termResults.UnionWith(intMatches);
+                        }
+
+                        if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
+                        {
+                            termResults.UnionWith(exactSet);
+                        }
+
+                        var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var token in stringTokens)
+                        {
+                            if (_stringIndex.TryGetValue(token, out var tokenSet))
+                            {
+                                termResults.UnionWith(tokenSet);
+                            }
+                        }
+
+                        if (termResults.Count == 0)
+                        {
+                            termResults.UnionWith(_items);
+                        }
+
+                        if (firstTerm)
+                        {
+                            results.UnionWith(termResults);
+                            firstTerm = false;
+                        }
+                        else
+                        {
+                            results.IntersectWith(termResults);
                         }
                     }
 
-                    // If no matches yet, include all items to allow partial matching in ContainsMatch
-                    if (termResults.Count == 0)
-                    {
-                        termResults.UnionWith(_items);
-                    }
-
-                    if (firstTerm)
-                    {
-                        results.UnionWith(termResults);
-                        firstTerm = false;
-                    }
-                    else
-                    {
-                        results.IntersectWith(termResults); // Still narrow, but broader initial set
-                    }
+                    return results.Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim())));
                 }
-
-                return results.Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim())));
-            }
-            else
-            {
-                foreach (var term in searchTerms)
+                else
                 {
-                    var trimmedTerm = term.Trim();
-
-                    if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
+                    foreach (var term in searchTerms)
                     {
-                        results.UnionWith(intMatches);
-                    }
+                        var trimmedTerm = term.Trim();
 
-                    if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
-                    {
-                        results.UnionWith(exactSet);
-                    }
-
-                    var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var token in stringTokens)
-                    {
-                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
                         {
-                            results.UnionWith(tokenSet);
+                            results.UnionWith(intMatches);
+                        }
+
+                        if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
+                        {
+                            results.UnionWith(exactSet);
+                        }
+
+                        var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var token in stringTokens)
+                        {
+                            if (_stringIndex.TryGetValue(token, out var tokenSet))
+                            {
+                                results.UnionWith(tokenSet);
+                            }
                         }
                     }
+
+                    if (results.Count == 0)
+                        results.UnionWith(_items);
+
+                    return results.Where(item => searchTerms.Any(term => ContainsMatch(item, term.Trim())));
                 }
-
-                if (results.Count == 0)
-                    results.UnionWith(_items);
-
-                return results.Where(item => searchTerms.Any(term => ContainsMatch(item, term.Trim())));
-            }
+            });
         }
 
         private bool ContainsMatch(T item, string? searchString)
@@ -362,18 +362,13 @@
                     if (int.TryParse(searchString, out int intSearch) && value is int intValue && intValue == intSearch)
                         return true;
                     if (value.ToString() is string strValue && strValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
-                        return true; // Allow partial string match for int
+                        return true;
                 }
                 else if (propType == typeof(byte[]))
                 {
                     if (value is byte[] byteValue && byteValue != null)
                     {
-                        string formattedValue = byteValue.Length switch
-                        {
-                            6 => FormatMacAddress(byteValue),
-                            16 => new Guid(byteValue).ToString(),
-                            _ => throw new ArgumentException($"Unexpected byte[] length {byteValue.Length} for property {prop.Name}")
-                        };
+                        string formattedValue = FormatByteArray(byteValue, prop.Name);
                         if (formattedValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
                             return true;
                     }
@@ -397,18 +392,13 @@
                                 if (int.TryParse(searchString, out int intSearch) && element is int intElement && intElement == intSearch)
                                     return true;
                                 if (element.ToString() is string strElement && strElement.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
-                                    return true; // Allow partial string match for int
+                                    return true;
                             }
                             else if (elementType == typeof(byte[]))
                             {
                                 if (element is byte[] byteElement && byteElement != null)
                                 {
-                                    string formattedElement = byteElement.Length switch
-                                    {
-                                        6 => FormatMacAddress(byteElement),
-                                        16 => new Guid(byteElement).ToString(),
-                                        _ => throw new ArgumentException($"Unexpected byte[] length {byteElement.Length}")
-                                    };
+                                    string formattedElement = FormatByteArray(byteElement, nameof(element));
                                     if (formattedElement.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
                                         return true;
                                 }
