@@ -245,47 +245,56 @@
 
         public async Task<IEnumerable<T>> SearchAsync(string? searchString, bool useAndCondition = true)
         {
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 if (string.IsNullOrEmpty(searchString)) return _items;
 
                 var searchTerms = searchString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
                 if (searchTerms.Length == 0) return _items;
 
+                var termResultsList = new List<HashSet<T>>(searchTerms.Length);
+
+                // Parallel pre-filtering for each term
+                await Task.WhenAll(searchTerms.Select(async term =>
+                {
+                    var trimmedTerm = term.Trim();
+                    var termResults = new HashSet<T>();
+
+                    if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
+                    {
+                        lock (termResults) termResults.UnionWith(intMatches);
+                    }
+
+                    if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
+                    {
+                        lock (termResults) termResults.UnionWith(exactSet);
+                    }
+
+                    var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var token in stringTokens)
+                    {
+                        if (_stringIndex.TryGetValue(token, out var tokenSet))
+                        {
+                            lock (termResults) termResults.UnionWith(tokenSet);
+                        }
+                    }
+
+                    if (termResults.Count == 0)
+                    {
+                        lock (termResults) termResults.UnionWith(_items);
+                    }
+
+                    lock (termResultsList) termResultsList.Add(termResults);
+                }));
+
+                // Combine results
                 var results = new HashSet<T>();
 
                 if (useAndCondition)
                 {
                     bool firstTerm = true;
-                    foreach (var term in searchTerms)
+                    foreach (var termResults in termResultsList)
                     {
-                        var trimmedTerm = term.Trim();
-                        var termResults = new HashSet<T>();
-
-                        if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
-                        {
-                            termResults.UnionWith(intMatches);
-                        }
-
-                        if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
-                        {
-                            termResults.UnionWith(exactSet);
-                        }
-
-                        var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                        foreach (var token in stringTokens)
-                        {
-                            if (_stringIndex.TryGetValue(token, out var tokenSet))
-                            {
-                                termResults.UnionWith(tokenSet);
-                            }
-                        }
-
-                        if (termResults.Count == 0)
-                        {
-                            termResults.UnionWith(_items);
-                        }
-
                         if (firstTerm)
                         {
                             results.UnionWith(termResults);
@@ -301,28 +310,9 @@
                 }
                 else
                 {
-                    foreach (var term in searchTerms)
+                    foreach (var termResults in termResultsList)
                     {
-                        var trimmedTerm = term.Trim();
-
-                        if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
-                        {
-                            results.UnionWith(intMatches);
-                        }
-
-                        if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
-                        {
-                            results.UnionWith(exactSet);
-                        }
-
-                        var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                        foreach (var token in stringTokens)
-                        {
-                            if (_stringIndex.TryGetValue(token, out var tokenSet))
-                            {
-                                results.UnionWith(tokenSet);
-                            }
-                        }
+                        results.UnionWith(termResults);
                     }
 
                     if (results.Count == 0)
