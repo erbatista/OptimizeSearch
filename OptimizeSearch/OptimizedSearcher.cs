@@ -52,7 +52,6 @@
                     {
                         lock (_stringIndex)
                         {
-                            // Index full value
                             if (!_stringIndex.TryGetValue(strValue, out var fullSet))
                             {
                                 fullSet = new HashSet<T>();
@@ -60,7 +59,6 @@
                             }
                             fullSet.Add(parentItem);
 
-                            // Index tokens
                             var words = strValue.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                             foreach (var word in words)
                             {
@@ -87,7 +85,6 @@
                             }
                             set.Add(parentItem);
                         }
-                        // Also index as string for partial matching
                         string strValue = intValue.ToString();
                         lock (_stringIndex)
                         {
@@ -113,7 +110,6 @@
 
                         lock (_stringIndex)
                         {
-                            // Index full value
                             if (!_stringIndex.TryGetValue(strValue, out var fullSet))
                             {
                                 fullSet = new HashSet<T>();
@@ -121,7 +117,6 @@
                             }
                             fullSet.Add(parentItem);
 
-                            // Index tokens
                             var words = strValue.Split(new[] { ' ', '-', ':' }, StringSplitOptions.RemoveEmptyEntries);
                             foreach (var word in words)
                             {
@@ -264,23 +259,17 @@
                 {
                     var trimmedTerm = term.Trim();
                     var termResults = new HashSet<T>();
-                    bool hasMatches = false;
 
-                    // Try exact int match first
-                    if (int.TryParse(trimmedTerm, out int intValue))
+                    // Try exact int match
+                    if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
                     {
-                        if (_intIndex.TryGetValue(intValue, out var intMatches))
-                        {
-                            termResults.UnionWith(intMatches);
-                            hasMatches = true;
-                        }
+                        termResults.UnionWith(intMatches);
                     }
 
-                    // Check full term and tokens in string index
+                    // Check string index for full term and tokens
                     if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
                     {
                         termResults.UnionWith(exactSet);
-                        hasMatches = true;
                     }
 
                     var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -289,12 +278,14 @@
                         if (_stringIndex.TryGetValue(token, out var tokenSet))
                         {
                             termResults.UnionWith(tokenSet);
-                            hasMatches = true;
                         }
                     }
 
-                    if (!hasMatches)
-                        return Enumerable.Empty<T>(); // Short-circuit if no matches for this term
+                    // If no matches yet, include all items to allow partial matching in ContainsMatch
+                    if (termResults.Count == 0)
+                    {
+                        termResults.UnionWith(_items);
+                    }
 
                     if (firstTerm)
                     {
@@ -303,12 +294,11 @@
                     }
                     else
                     {
-                        results.IntersectWith(termResults); // Narrow down results
+                        results.IntersectWith(termResults); // Still narrow, but broader initial set
                     }
                 }
 
-                // Minimal final check for substring matches
-                return results.Where(item => searchTerms.All(term => MatchesItem(item, term.Trim())));
+                return results.Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim())));
             }
             else
             {
@@ -316,12 +306,9 @@
                 {
                     var trimmedTerm = term.Trim();
 
-                    if (int.TryParse(trimmedTerm, out int intValue))
+                    if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
                     {
-                        if (_intIndex.TryGetValue(intValue, out var intMatches))
-                        {
-                            results.UnionWith(intMatches);
-                        }
+                        results.UnionWith(intMatches);
                     }
 
                     if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
@@ -342,20 +329,8 @@
                 if (results.Count == 0)
                     results.UnionWith(_items);
 
-                return results.Where(item => searchTerms.Any(term => MatchesItem(item, term.Trim())));
+                return results.Where(item => searchTerms.Any(term => ContainsMatch(item, term.Trim())));
             }
-        }
-
-        private bool MatchesItem(T item, string searchString)
-        {
-            // Check if the exact term matches any indexed value directly
-            if (_stringIndex.ContainsKey(searchString) && _stringIndex[searchString].Contains(item))
-                return true;
-            if (int.TryParse(searchString, out int intValue) && _intIndex.ContainsKey(intValue) && _intIndex[intValue].Contains(item))
-                return true;
-
-            // Fallback to full substring check if needed
-            return ContainsMatch(item, searchString);
         }
 
         private bool ContainsMatch(T item, string? searchString)
@@ -386,6 +361,8 @@
                 {
                     if (int.TryParse(searchString, out int intSearch) && value is int intValue && intValue == intSearch)
                         return true;
+                    if (value.ToString() is string strValue && strValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
+                        return true; // Allow partial string match for int
                 }
                 else if (propType == typeof(byte[]))
                 {
@@ -419,6 +396,8 @@
                             {
                                 if (int.TryParse(searchString, out int intSearch) && element is int intElement && intElement == intSearch)
                                     return true;
+                                if (element.ToString() is string strElement && strElement.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
+                                    return true; // Allow partial string match for int
                             }
                             else if (elementType == typeof(byte[]))
                             {
