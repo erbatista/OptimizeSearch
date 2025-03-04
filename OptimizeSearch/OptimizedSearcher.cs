@@ -254,6 +254,89 @@
 
                 var termResultsList = new List<HashSet<T>>(searchTerms.Length);
 
+                // Parallel pre-filtering with Task.WhenAll using thread-local storage
+                await Task.WhenAll(searchTerms.Select(term =>
+                    Task.Run(() =>
+                    {
+                        var trimmedTerm = term.Trim();
+                        var termResults = new HashSet<T>(); // Local to this task, no lock needed
+
+                        if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
+                        {
+                            termResults.UnionWith(intMatches);
+                        }
+
+                        if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
+                        {
+                            termResults.UnionWith(exactSet);
+                        }
+
+                        var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var token in stringTokens)
+                        {
+                            if (_stringIndex.TryGetValue(token, out var tokenSet))
+                            {
+                                termResults.UnionWith(tokenSet);
+                            }
+                        }
+
+                        if (termResults.Count == 0)
+                        {
+                            termResults.UnionWith(_items);
+                        }
+
+                        // Add to shared list after task completion (thread-safe since Add is atomic here)
+                        lock (termResultsList) termResultsList.Add(termResults);
+                    })
+                ));
+
+                // Combine results
+                var results = new HashSet<T>();
+
+                if (useAndCondition)
+                {
+                    bool firstTerm = true;
+                    foreach (var termResults in termResultsList)
+                    {
+                        if (firstTerm)
+                        {
+                            results.UnionWith(termResults);
+                            firstTerm = false;
+                        }
+                        else
+                        {
+                            results.IntersectWith(termResults);
+                        }
+                    }
+
+                    return results.Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim())));
+                }
+                else
+                {
+                    foreach (var termResults in termResultsList)
+                    {
+                        results.UnionWith(termResults);
+                    }
+
+                    if (results.Count == 0)
+                        results.UnionWith(_items);
+
+                    return results.Where(item => searchTerms.Any(term => ContainsMatch(item, term.Trim())));
+                }
+            });
+        }
+
+        public async Task<IEnumerable<T>> SearchAsync2(string? searchString, bool useAndCondition = true)
+        {
+            return await Task.Run(async () =>
+            {
+                if (string.IsNullOrEmpty(searchString)) return _items;
+
+                var searchTerms = searchString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                if (searchTerms.Length == 0) return _items;
+
+                var termResultsList = new List<HashSet<T>>(searchTerms.Length);
+
                 // Parallel pre-filtering for each term
                 await Task.WhenAll(searchTerms.Select(async term =>
                 {
