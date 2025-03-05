@@ -12,14 +12,12 @@
     public class OptimizedSearcher<T>
     {
         private readonly Dictionary<string, HashSet<T>> _stringIndex;
-        private readonly Dictionary<int, HashSet<T>> _intIndex;
         private readonly IEnumerable<T> _items;
 
         public OptimizedSearcher(IEnumerable<T> items)
         {
             _items = items ?? throw new ArgumentNullException(nameof(items));
             _stringIndex = new Dictionary<string, HashSet<T>>(StringComparer.OrdinalIgnoreCase);
-            _intIndex = new Dictionary<int, HashSet<T>>();
 
             BuildIndex();
         }
@@ -72,29 +70,17 @@
                         }
                     }
                 }
-                else if (propType == typeof(int))
+                else if (propType == typeof(int) || propType == typeof(uint) || propType == typeof(long) || propType == typeof(ulong) || propType == typeof(double))
                 {
-                    if (value is int intValue)
+                    string strValue = propType == typeof(double) ? ((double)value).ToString("F2") : value.ToString()!;
+                    lock (_stringIndex)
                     {
-                        lock (_intIndex)
+                        if (!_stringIndex.TryGetValue(strValue, out var set))
                         {
-                            if (!_intIndex.TryGetValue(intValue, out var set))
-                            {
-                                set = new HashSet<T>();
-                                _intIndex[intValue] = set;
-                            }
-                            set.Add(parentItem);
+                            set = new HashSet<T>();
+                            _stringIndex[strValue] = set;
                         }
-                        string strValue = intValue.ToString();
-                        lock (_stringIndex)
-                        {
-                            if (!_stringIndex.TryGetValue(strValue, out var strSet))
-                            {
-                                strSet = new HashSet<T>();
-                                _stringIndex[strValue] = strSet;
-                            }
-                            strSet.Add(parentItem);
-                        }
+                        set.Add(parentItem);
                     }
                 }
                 else if (propType == typeof(byte[]))
@@ -160,29 +146,17 @@
                                     }
                                 }
                             }
-                            else if (elementType == typeof(int))
+                            else if (elementType == typeof(int) || elementType == typeof(uint) || elementType == typeof(long) || elementType == typeof(ulong) || elementType == typeof(double))
                             {
-                                if (element is int intElement)
+                                string strElement = elementType == typeof(double) ? ((double)element).ToString("F2") : element.ToString()!;
+                                lock (_stringIndex)
                                 {
-                                    lock (_intIndex)
+                                    if (!_stringIndex.TryGetValue(strElement, out var set))
                                     {
-                                        if (!_intIndex.TryGetValue(intElement, out var set))
-                                        {
-                                            set = new HashSet<T>();
-                                            _intIndex[intElement] = set;
-                                        }
-                                        set.Add(parentItem);
+                                        set = new HashSet<T>();
+                                        _stringIndex[strElement] = set;
                                     }
-                                    string strElement = intElement.ToString();
-                                    lock (_stringIndex)
-                                    {
-                                        if (!_stringIndex.TryGetValue(strElement, out var strSet))
-                                        {
-                                            strSet = new HashSet<T>();
-                                            _stringIndex[strElement] = strSet;
-                                        }
-                                        strSet.Add(parentItem);
-                                    }
+                                    set.Add(parentItem);
                                 }
                             }
                             else if (elementType == typeof(byte[]))
@@ -254,17 +228,11 @@
 
                 var termResultsList = new List<HashSet<T>>(searchTerms.Length);
 
-                // Parallel pre-filtering with Task.WhenAll using thread-local storage
                 await Task.WhenAll(searchTerms.Select(term =>
                     Task.Run(() =>
                     {
                         var trimmedTerm = term.Trim();
-                        var termResults = new HashSet<T>(); // Local to this task, no lock needed
-
-                        if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
-                        {
-                            termResults.UnionWith(intMatches);
-                        }
+                        var termResults = new HashSet<T>();
 
                         if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
                         {
@@ -285,92 +253,10 @@
                             termResults.UnionWith(_items);
                         }
 
-                        // Add to shared list after task completion (thread-safe since Add is atomic here)
                         lock (termResultsList) termResultsList.Add(termResults);
                     })
                 ));
 
-                // Combine results
-                var results = new HashSet<T>();
-
-                if (useAndCondition)
-                {
-                    bool firstTerm = true;
-                    foreach (var termResults in termResultsList)
-                    {
-                        if (firstTerm)
-                        {
-                            results.UnionWith(termResults);
-                            firstTerm = false;
-                        }
-                        else
-                        {
-                            results.IntersectWith(termResults);
-                        }
-                    }
-
-                    return results.Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim())));
-                }
-                else
-                {
-                    foreach (var termResults in termResultsList)
-                    {
-                        results.UnionWith(termResults);
-                    }
-
-                    if (results.Count == 0)
-                        results.UnionWith(_items);
-
-                    return results.Where(item => searchTerms.Any(term => ContainsMatch(item, term.Trim())));
-                }
-            });
-        }
-
-        public async Task<IEnumerable<T>> SearchAsync2(string? searchString, bool useAndCondition = true)
-        {
-            return await Task.Run(async () =>
-            {
-                if (string.IsNullOrEmpty(searchString)) return _items;
-
-                var searchTerms = searchString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                if (searchTerms.Length == 0) return _items;
-
-                var termResultsList = new List<HashSet<T>>(searchTerms.Length);
-
-                // Parallel pre-filtering for each term
-                await Task.WhenAll(searchTerms.Select(async term =>
-                {
-                    var trimmedTerm = term.Trim();
-                    var termResults = new HashSet<T>();
-
-                    if (int.TryParse(trimmedTerm, out int intValue) && _intIndex.TryGetValue(intValue, out var intMatches))
-                    {
-                        lock (termResults) termResults.UnionWith(intMatches);
-                    }
-
-                    if (_stringIndex.TryGetValue(trimmedTerm, out var exactSet))
-                    {
-                        lock (termResults) termResults.UnionWith(exactSet);
-                    }
-
-                    var stringTokens = trimmedTerm.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var token in stringTokens)
-                    {
-                        if (_stringIndex.TryGetValue(token, out var tokenSet))
-                        {
-                            lock (termResults) termResults.UnionWith(tokenSet);
-                        }
-                    }
-
-                    if (termResults.Count == 0)
-                    {
-                        lock (termResults) termResults.UnionWith(_items);
-                    }
-
-                    lock (termResultsList) termResultsList.Add(termResults);
-                }));
-
-                // Combine results
                 var results = new HashSet<T>();
 
                 if (useAndCondition)
@@ -434,7 +320,25 @@
                 {
                     if (int.TryParse(searchString, out int intSearch) && value is int intValue && intValue == intSearch)
                         return true;
-                    if (value.ToString() is string strValue && strValue.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
+                }
+                else if (propType == typeof(uint))
+                {
+                    if (uint.TryParse(searchString, out uint uintSearch) && value is uint uintValue && uintValue == uintSearch)
+                        return true;
+                }
+                else if (propType == typeof(long))
+                {
+                    if (long.TryParse(searchString, out long longSearch) && value is long longValue && longValue == longSearch)
+                        return true;
+                }
+                else if (propType == typeof(ulong))
+                {
+                    if (ulong.TryParse(searchString, out ulong ulongSearch) && value is ulong ulongValue && ulongValue == ulongSearch)
+                        return true;
+                }
+                else if (propType == typeof(double))
+                {
+                    if (double.TryParse(searchString, out double doubleSearch) && value is double doubleValue && doubleValue == doubleSearch)
                         return true;
                 }
                 else if (propType == typeof(byte[]))
@@ -464,7 +368,25 @@
                             {
                                 if (int.TryParse(searchString, out int intSearch) && element is int intElement && intElement == intSearch)
                                     return true;
-                                if (element.ToString() is string strElement && strElement.IndexOf(searchString, StringComparison.OrdinalIgnoreCase) >= 0)
+                            }
+                            else if (elementType == typeof(uint))
+                            {
+                                if (uint.TryParse(searchString, out uint uintSearch) && element is uint uintElement && uintElement == uintSearch)
+                                    return true;
+                            }
+                            else if (elementType == typeof(long))
+                            {
+                                if (long.TryParse(searchString, out long longSearch) && element is long longElement && longElement == longSearch)
+                                    return true;
+                            }
+                            else if (elementType == typeof(ulong))
+                            {
+                                if (ulong.TryParse(searchString, out ulong ulongSearch) && element is ulong ulongElement && ulongElement == ulongSearch)
+                                    return true;
+                            }
+                            else if (elementType == typeof(double))
+                            {
+                                if (double.TryParse(searchString, out double doubleSearch) && element is double doubleElement && doubleElement == doubleSearch)
                                     return true;
                             }
                             else if (elementType == typeof(byte[]))
