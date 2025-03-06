@@ -72,7 +72,7 @@
                 }
                 else if (propType == typeof(int) || propType == typeof(uint) || propType == typeof(long) || propType == typeof(ulong) || propType == typeof(double))
                 {
-                    string strValue = propType == typeof(double) ? ((double)value).ToString("F2") : value.ToString()!;
+                    string strValue = value.ToString()!;
                     lock (_stringIndex)
                     {
                         if (!_stringIndex.TryGetValue(strValue, out var set))
@@ -148,7 +148,7 @@
                             }
                             else if (elementType == typeof(int) || elementType == typeof(uint) || elementType == typeof(long) || elementType == typeof(ulong) || elementType == typeof(double))
                             {
-                                string strElement = elementType == typeof(double) ? ((double)element).ToString("F2") : element.ToString()!;
+                                string strElement = element.ToString()!; // Full precision for double
                                 lock (_stringIndex)
                                 {
                                     if (!_stringIndex.TryGetValue(strElement, out var set))
@@ -217,7 +217,9 @@
             };
         }
 
-        public async Task<IEnumerable<T>> SearchAsync(string? searchString, bool useAndCondition = true)
+        public async Task<IEnumerable<T>> SearchAsync(
+            string searchString,
+            bool useAndCondition = true)
         {
             return await Task.Run(async () =>
             {
