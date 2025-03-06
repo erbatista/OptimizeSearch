@@ -63,8 +63,8 @@ namespace OptimizeSearch
         };
 
             var searcher = new OptimizedSearcher<BaseItem>(items);
-            var results = searcher.Search("Tasty,00:11", useAndCondition: true);
-            foreach (var item in results)
+            var results = searcher.SearchAsync("Tasty,00:11", useAndCondition: true);
+            foreach (var item in results.Result)
             {
                 if (item is MyItemA a)
                     Console.WriteLine($"MyItemA: {a.Name} - {string.Join(", ", a.ComplexList!.Select(c => c.Details))}");
