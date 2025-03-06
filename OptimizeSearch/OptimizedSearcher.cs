@@ -3,6 +3,7 @@
 #nullable enable
 
     using System;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
@@ -148,7 +149,7 @@
                             }
                             else if (elementType == typeof(int) || elementType == typeof(uint) || elementType == typeof(long) || elementType == typeof(ulong) || elementType == typeof(double))
                             {
-                                string strElement = element.ToString()!; // Full precision for double
+                                string strElement = element.ToString()!;
                                 lock (_stringIndex)
                                 {
                                     if (!_stringIndex.TryGetValue(strElement, out var set))
@@ -217,9 +218,7 @@
             };
         }
 
-        public async Task<IEnumerable<T>> SearchAsync(
-            string searchString,
-            bool useAndCondition = true)
+        public async Task<IEnumerable<T>> SearchAsync(string? searchString, bool useAndCondition = true)
         {
             return await Task.Run(async () =>
             {
@@ -277,7 +276,8 @@
                         }
                     }
 
-                    return results.Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim())));
+                    // Parallelize final filtering with PLINQ
+                    return results.AsParallel().Where(item => searchTerms.All(term => ContainsMatch(item, term.Trim())));
                 }
                 else
                 {
@@ -289,7 +289,8 @@
                     if (results.Count == 0)
                         results.UnionWith(_items);
 
-                    return results.Where(item => searchTerms.Any(term => ContainsMatch(item, term.Trim())));
+                    // Parallelize final filtering with PLINQ
+                    return results.AsParallel().Where(item => searchTerms.Any(term => ContainsMatch(item, term.Trim())));
                 }
             });
         }
