@@ -1,0 +1,65 @@
+using System;
+using System.Windows;
+using System.Windows.Controls;
+
+namespace GpsCoordinates
+{
+    public partial class GpsCoordinatesControl : UserControl
+    {
+        public static readonly DependencyProperty LatitudeProperty = 
+            DependencyProperty.Register("Latitude", typeof(double), typeof(GpsCoordinatesControl), 
+                new PropertyMetadata(0.0));
+
+        public static readonly DependencyProperty LongitudeProperty = 
+            DependencyProperty.Register("Longitude", typeof(double), typeof(GpsCoordinatesControl), 
+                new PropertyMetadata(0.0));
+
+        public static readonly DependencyProperty AltitudeProperty = 
+            DependencyProperty.Register("Altitude", typeof(double), typeof(GpsCoordinatesControl), 
+                new PropertyMetadata(0.0));
+
+        public double Latitude
+        {
+            get { return (double)GetValue(LatitudeProperty); }
+            set { SetValue(LatitudeProperty, value); }
+        }
+
+        public double Longitude
+        {
+            get { return (double)GetValue(LongitudeProperty); }
+            set { SetValue(LongitudeProperty, value); }
+        }
+
+        public double Altitude
+        {
+            get { return (double)GetValue(AltitudeProperty); }
+            set { SetValue(AltitudeProperty, value); }
+        }
+
+        public GpsCoordinatesControl()
+        {
+            InitializeComponent();
+        }
+
+        private void CopyLatitude_Click(object sender, RoutedEventArgs e)
+        {
+            Clipboard.SetText(Latitude.ToString());
+        }
+
+        private void CopyLongitude_Click(object sender, RoutedEventArgs e)
+        {
+            Clipboard.SetText(Longitude.ToString());
+        }
+
+        private void CopyAltitude_Click(object sender, RoutedEventArgs e)
+        {
+            Clipboard.SetText(Altitude.ToString());
+        }
+
+        private void CopyAll_Click(object sender, RoutedEventArgs e)
+        {
+            string allCoordinates = $"Latitude: {Latitude}\nLongitude: {Longitude}\nAltitude: {Altitude}";
+            Clipboard.SetText(allCoordinates);
+        }
+    }
+}
