@@ -1,0 +1,48 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
+namespace YourNamespace.ViewModels
+{
+    public class MyViewModel : INotifyPropertyChanged
+    {
+        private object _itemToScrollTo;
+        private ObservableCollection<string> _myItems = new ObservableCollection<string>();
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public ObservableCollection<string> MyItems
+        {
+            get => _myItems;
+            set
+            {
+                _myItems = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public object ItemToScrollTo
+        {
+            get => _itemToScrollTo;
+            set
+            {
+                _itemToScrollTo = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public MyViewModel()
+        {
+            // Sample data
+            for (int i = 1; i <= 100; i++)
+            {
+                MyItems.Add($"Item {i}");
+            }
+        }
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+}

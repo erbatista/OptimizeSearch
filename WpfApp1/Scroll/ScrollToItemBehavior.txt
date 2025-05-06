@@ -1,0 +1,32 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Interactivity;
+
+namespace YourNamespace.Behaviors
+{
+    public class ScrollToItemBehavior : Behavior<ListBox>
+    {
+        public static readonly DependencyProperty ItemToScrollToProperty = DependencyProperty.Register(
+            nameof(ItemToScrollTo),
+            typeof(object),
+            typeof(ScrollToItemBehavior),
+            new PropertyMetadata(null, OnItemToScrollToChanged));
+
+        public object ItemToScrollTo
+        {
+            get => GetValue(ItemToScrollToProperty);
+            set => SetValue(ItemToScrollToProperty, value);
+        }
+
+        private static void OnItemToScrollToChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (d is ScrollToItemBehavior behavior && behavior.AssociatedObject is ListBox listBox)
+            {
+                if (e.NewValue != null)
+                {
+                    listBox.ScrollIntoView(e.NewValue);
+                }
+            }
+        }
+    }
+}

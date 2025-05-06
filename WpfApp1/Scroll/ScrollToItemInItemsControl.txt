@@ -1,0 +1,28 @@
+using System.Windows;
+using System.Windows.Controls;
+
+public static class ItemsControlExtensions
+{
+    public static void ScrollToItem(this ItemsControl itemsControl, object item)
+    {
+        // Ensure the item exists in the ItemsControl
+        if (itemsControl.Items.Contains(item))
+        {
+            // Get the container for the item
+            var container = itemsControl.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
+            if (container != null)
+            {
+                // Bring the container into view
+                container.BringIntoView();
+            }
+            else
+            {
+                // If the container isn't generated yet (e.g., due to virtualization),
+                // force layout update and try again
+                itemsControl.UpdateLayout();
+                container = itemsControl.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
+                container?.BringIntoView();
+            }
+        }
+    }
+}
