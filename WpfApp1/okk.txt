@@ -31,14 +31,81 @@ Acceptance Criteria:
     When default values are provided via data binding,
     Then the control must accurately reflect these initial Override (boolean) and Value (Int32) states.
 
+    Given the user toggles the "Override" button (either on or off),
+    When the state changes,
+    Then the application must immediately send an OverrideValueRequest to the configured endpoint, containing both the new Override boolean and the current Value integer.
+
+    Given an OverrideValueRequest has been sent,
+    When the application receives a successful OverrideValueResponse (where Success is true),
+    Then the UI state remains as set by the user, confirming the change.
+
+    Given an OverrideValueRequest has been sent,
+    When the application receives a failed OverrideValueResponse (where Success is false),
+    Then the "Override" toggle must revert to its previous state, and the Error message from the response must be displayed to the user.
+
 Notes for Implementation (WPF Specific):
 
     The control should be implemented as a UserControl to ensure reusability.
 
     Use XAML data binding with a TwoWay mode to link the UI elements to the underlying view model properties (bool Override, Int32 Value).
 
+    The view model responsible for this control must handle the asynchronous logic for sending the OverrideValueRequest and processing the OverrideValueResponse. Consider using async/await patterns.
+
     Implement input validation on the TextBox to restrict input to integers only. This can be done via a behavior, an attached property, or by handling the PreviewTextInput event.
 
     Use a Style with a DataTrigger bound to the IsChecked property of the toggle button to automatically enable/disable the numeric TextBox.
 
     The control's DataContext should be set to a view model or object that exposes the Override and Value properties.
+
+    A user feedback mechanism should be considered to indicate that a background operation is in progress (e.g., a temporary loading spinner) and to display any error messages from the API response.
+
+
+
+
+
+
+
+
+    *************************************
+    User Story: Validate Override Value via Endpoint
+
+Title: Validate Filter Operation Override via Backend Service
+
+As a System,
+I want to send an OverrideValueRequest to a backend endpoint whenever the user modifies the override setting,
+so that the change can be validated and persisted, and any business rule violations are communicated back to the user.
+Acceptance Criteria:
+
+    Given the user changes the Override toggle state in the UI,
+    When the corresponding view model property is updated,
+    Then an OverrideValueRequest must be constructed and sent to the configured endpoint.
+
+    Given the request is being constructed,
+    When it is prepared for sending,
+    Then it must contain the Override boolean and the current Value integer from the view model.
+
+    Given the endpoint returns a successful OverrideValueResponse (where Success is true),
+    When the response is processed,
+    Then the system acknowledges the change as valid, and no UI state reversal is needed.
+
+    Given the endpoint returns a failed OverrideValueResponse (where Success is false),
+    When the response is processed,
+    Then the system must trigger a mechanism to inform the UI to revert the Override toggle to its previous state.
+
+    Given a failed OverrideValueResponse is received,
+    When it is processed,
+    Then the Error message string from the response must be captured and made available to be displayed to the user.
+
+    Given a network error or service timeout occurs while sending the request,
+    When the error is caught,
+    Then the system should treat it as a failed validation, revert the UI state, and present a generic error message (e.g., "Failed to connect to the service.").
+
+Notes for Implementation (WPF Specific):
+
+    This logic should be encapsulated within the view model that serves as the DataContext for the common user control, not in the UserControl's code-behind.
+
+    Use an async/await pattern to call the endpoint without blocking the UI thread.
+
+    The view model should maintain the "previous state" of the Override toggle so it can be reverted upon failure. This is critical for fulfilling acceptance criterion #4.
+
+    Implement a mechanism (e.g., a property on the view model, a messaging system) for communicating the Error string back to the view for display in a TextBlock or a popup notification.
