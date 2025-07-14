@@ -1,0 +1,44 @@
+User Story: Common Operation Configuration Control
+
+Title: Create a Reusable Configuration Control for All Filter Operations
+
+As a Programmer,
+I want to create a common WPF user control that can be included within the configuration view for any selected filter operation,
+so that I can provide a consistent way for users to set a standard Override and Value parameter across different operations, reducing code duplication and standardizing the UI.
+Acceptance Criteria:
+
+    Given the common configuration control is displayed,
+    When it is first rendered,
+    Then it must contain a toggle button (e.g., ToggleButton or CheckBox) labeled "Override" and a numeric input field (e.g., TextBox) for an integer value.
+
+    Given the "Override" toggle button is in its "off" (unchecked) state,
+    When the user views the control,
+    Then the numeric input field must be disabled and visually indicate that it is not editable (e.g., grayed out).
+
+    Given the "Override" toggle button is in its "off" (unchecked) state,
+    When the user clicks it,
+    Then the toggle button must switch to its "on" (checked) state, and the numeric input field must become enabled and editable.
+
+    Given the numeric input field is enabled,
+    When the user enters a non-numeric character,
+    Then the input must be rejected, and only integer values (0-9) should be permitted.
+
+    Given the control is part of a larger view,
+    When the user interacts with the toggle and the numeric input,
+    Then the control's state must be correctly data-bound to two properties: a boolean for the toggle (Override) and an Int32 for the numeric field (Value).
+
+    Given the control is instantiated,
+    When default values are provided via data binding,
+    Then the control must accurately reflect these initial Override (boolean) and Value (Int32) states.
+
+Notes for Implementation (WPF Specific):
+
+    The control should be implemented as a UserControl to ensure reusability.
+
+    Use XAML data binding with a TwoWay mode to link the UI elements to the underlying view model properties (bool Override, Int32 Value).
+
+    Implement input validation on the TextBox to restrict input to integers only. This can be done via a behavior, an attached property, or by handling the PreviewTextInput event.
+
+    Use a Style with a DataTrigger bound to the IsChecked property of the toggle button to automatically enable/disable the numeric TextBox.
+
+    The control's DataContext should be set to a view model or object that exposes the Override and Value properties.
