@@ -109,3 +109,38 @@ Notes for Implementation (WPF Specific):
     The view model should maintain the "previous state" of the Override toggle so it can be reverted upon failure. This is critical for fulfilling acceptance criterion #4.
 
     Implement a mechanism (e.g., a property on the view model, a messaging system) for communicating the Error string back to the view for display in a TextBlock or a popup notification.
+
+
+    3*************************************************
+    User Story: Display Override Value Warning
+
+Title: Notify User of Suboptimal Override Value During Operation
+
+As a User,
+I want to be notified during an operation if the override value I've set is considered suboptimal by the server,
+so that I can make an informed decision about whether to let the operation continue or to stop it and adjust my settings for better results.
+Acceptance Criteria:
+
+    Given the client application is handling OperationProgressEvents from the server,
+    When an OperationProgressEvent is received that contains the field OverrideValueWarning set to true,
+    Then a clear, non-blocking warning message must be displayed to the user.
+
+    Given the warning is to be displayed,
+    When the message is shown,
+    Then its text must clearly state that the server has identified a better value (e.g., "Warning: The server suggests a more optimal value is available than the one provided.").
+
+    Given an OperationProgressEvent is received,
+    When the OverrideValueWarning field is false or not present in the event payload,
+    Then no new warning message regarding the override value should be shown.
+
+    Given the warning message is displayed,
+    When the user sees it,
+    Then the message must not interrupt or block the ongoing operation or prevent the user from interacting with other parts of the application.
+
+Notes for Implementation (WPF Specific):
+
+    The logic to inspect the OperationProgressEvent should be located in the application's event handling or service layer.
+
+    The warning message should be displayed using a non-modal UI element like a toast notification, a temporary banner at the top/bottom of the relevant view, or a message in a status bar. Avoid using a MessageBox which would block the UI.
+
+    Consider implementing a dedicated notification service that can be called from the event handling logic to display messages to the user. This decouples the event processing from the UI implementation.
