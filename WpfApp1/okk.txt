@@ -145,6 +145,54 @@ Notes for Implementation (WPF Specific):
 
     Consider implementing a dedicated notification service that can be called from the event handling logic to display messages to the user. This decouples the event processing from the UI implementation.
 
+******************************************************************************************************
+User Story: Relocate Common Configuration Control
+
+Title: Refactor Common Configuration Control into New Parent Container
+
+As a Programmer,
+I want to move the existing common configuration UserControl from its current location into a new parent control,
+so that the UI architecture is cleaner and aligns with updated design requirements, ensuring the control can be used effectively in its new context.
+Acceptance Criteria:
+
+    Given the refactoring task is complete,
+    When the application is run,
+    Then the common configuration control (with the "Override" toggle and numeric field) must no longer be present in its original parent control.
+
+    Given the refactoring task is complete,
+    When the user navigates to the view containing the new parent control,
+    Then the common configuration control must be correctly rendered inside its new parent.
+
+    Given the control is rendered in its new location,
+    When the user interacts with it,
+    Then all existing functionality must remain intact and fully operational, including:
+
+        Toggling "Override" enables/disables the numeric field.
+
+        Data binding to the Override and Value properties works correctly.
+
+        The OverrideValueRequest is sent to the endpoint upon toggling.
+
+        Responses from the endpoint are handled correctly (reverting state on failure).
+
+    Given the control is in its new parent,
+    When the UI is rendered,
+    Then the layout, alignment, and spacing of the control must be visually correct and consistent with the design of the new parent container.
+
+    Given the control has been moved,
+    When the code is reviewed,
+    Then the DataContext for the UserControl must be correctly inherited or set within its new position in the visual tree.
+
+Notes for Implementation (WPF Specific):
+
+    This is primarily a refactoring task. The focus is on moving existing XAML and ensuring bindings are re-established correctly.
+
+    Pay close attention to the DataContext. The new parent control might have a different DataContext than the original, which could require adjustments to the binding paths.
+
+    Thorough regression testing is critical to ensure that no functionality was broken during the move. All acceptance criteria from the original user stories for this control must still pass.
+
+    Visual styles (implicit or explicit) might need to be adjusted if the new parent container affects them differently (e.g., through resource dictionaries or inherited properties).
+
 
     *********using System.ComponentModel;
 using System.Diagnostics;
