@@ -144,3 +144,97 @@ Notes for Implementation (WPF Specific):
     The warning message should be displayed using a non-modal UI element like a toast notification, a temporary banner at the top/bottom of the relevant view, or a message in a status bar. Avoid using a MessageBox which would block the UI.
 
     Consider implementing a dedicated notification service that can be called from the event handling logic to display messages to the user. This decouples the event processing from the UI implementation.
+
+
+    *********using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Input;
+
+public class AutoSaveViewModel : INotifyPropertyChanged
+{
+    private string _userNotes;
+    private string _saveStatus;
+    private CancellationTokenSource _debounceCts;
+
+    // This command will contain the save logic
+    public ICommand SaveNotesCommand { get; }
+
+    public string UserNotes
+    {
+        get => _userNotes;
+        set
+        {
+            if (_userNotes != value)
+            {
+                _userNotes = value;
+                OnPropertyChanged();
+                
+                // On every keystroke, execute the debounced save command
+                SaveNotesCommand.Execute(value);
+            }
+        }
+    }
+
+    public string SaveStatus
+    {
+        get => _saveStatus;
+        set
+        {
+            _saveStatus = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public AutoSaveViewModel()
+    {
+        SaveNotesCommand = new AsyncRelayCommand(PerformDebouncedSaveAsync);
+    }
+
+    private async Task PerformDebouncedSaveAsync(object parameter)
+    {
+        var notesToSave = parameter as string;
+
+        try
+        {
+            // Update status immediately to show something is happening
+            SaveStatus = "Typing...";
+
+            // Cancel any previous, still-pending save operation
+            _debounceCts?.Cancel();
+            _debounceCts = new CancellationTokenSource();
+
+            // Wait for 1.5 seconds. If the user types again, this will be
+            // cancelled and a new one will start.
+            await Task.Delay(1500, _debounceCts.Token);
+
+            // If we got here without being cancelled, proceed with the save.
+            SaveStatus = "Saving...";
+            Debug.WriteLine($"SAVING: '{notesToSave}'");
+            
+            // Your actual API call
+            await WebApiService.SaveNotesAsync(notesToSave);
+            
+            SaveStatus = "Saved.";
+        }
+        catch (TaskCanceledException)
+        {
+            // This is expected. It means the user is still typing.
+            // We don't need to do anything.
+        }
+        catch (Exception ex)
+        {
+            SaveStatus = "Error saving changes.";
+            Debug.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    // --- INotifyPropertyChanged Implementation ---
+    public event PropertyChangedEventHandler PropertyChanged;
+    protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}
