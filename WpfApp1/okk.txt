@@ -286,3 +286,37 @@ public class AutoSaveViewModel : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }
+
+*******************************************************************
+User Story: Adapt to API Contract Change for Override Validation
+
+Title: Update Client to Align with New Override Validation API Contract
+
+As a System,
+I want to update the data models and logic for the override validation endpoint,
+so that the client application can correctly communicate with the updated backend service and avoid data serialization errors.
+Acceptance Criteria:
+
+    Given the API contract for OverrideValueRequest has changed (e.g., the Value field is now a string instead of an Int32),
+    When the client prepares to send the request,
+    Then the client-side data model for the request must match the new structure, and the data must be correctly formatted (e.g., the integer value is converted to a string).
+
+    Given the API contract for OverrideValueResponse has changed (e.g., Success is renamed to IsValid and Error is now ErrorMessage),
+    When the client receives and deserializes the response,
+    Then the client-side data model for the response must match the new structure.
+
+    Given the response model has been updated,
+    When the client-side logic processes the response,
+    Then it must correctly read the new fields (IsValid, ErrorMessage) to determine the outcome of the request.
+
+    Given all necessary code changes have been implemented,
+    When the user toggles the "Override" feature,
+    Then the end-to-end functionality must work correctly with the new API contract, successfully handling both valid and invalid responses without crashing.
+
+Notes for Implementation:
+
+    Update the client-side Data Transfer Objects (DTOs) or model classes that represent the OverrideValueRequest and OverrideValueResponse.
+
+    Adjust any logic responsible for serializing the request and deserializing the response.
+
+    This is a high-risk change for breaking functionality. Thorough testing is required to verify that the communication with the endpoint is successful and that the application behaves as expected for both success and failure cases.
