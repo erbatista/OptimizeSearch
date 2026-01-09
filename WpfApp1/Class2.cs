@@ -4,125 +4,117 @@ using System.Threading.Tasks;
 
 public class ClassA
 {
-    // The main flag indicating work is being done
     private bool _isBusy = false;
 
-    // The "Waiting Room" for the single pending item. 
-    // If this is not null, it means someone is waiting in line.
-    private TaskCompletionSource<bool> _pendingJobTcs;
+    // The "Waiting Room" for the SINGLE pending item.
+    private TaskCompletionSource<bool> _pendingJobTicket;
 
-    // Lock object to protect our state (_isBusy and _pendingJobTcs)
-    private readonly object _stateLock = new object();
+    // The Lock for thread safety
+    private readonly object _lock = new object();
 
     public bool AwaitingEvent => _isBusy;
 
     public async Task Run()
     {
-        TaskCompletionSource<bool> myWaitTicket = null;
-        bool amIRunningImmediately = false;
+        TaskCompletionSource<bool> myTicket = null;
+        bool runImmediately = false;
 
-        // --- STEP 1: Determine if we run, queue, or reject ---
-        lock (_stateLock)
+        // --- PHASE 1: Try to Enter ---
+        lock (_lock)
         {
             if (!_isBusy)
             {
-                // Scenario A: Free to run immediately
+                // CASE 1: Not busy. Run immediately.
                 _isBusy = true;
-                amIRunningImmediately = true;
+                runImmediately = true;
             }
             else
             {
-                if (_pendingJobTcs != null)
+                // CASE 2: Busy. Check Queue.
+                if (_pendingJobTicket != null)
                 {
-                    // Scenario B: Busy AND Queue is full. 
-                    // Reject this call completely (Rule #1).
+                    // Rule: Only one pending call. 
+                    // If queue is full, IGNORE/REJECT this call.
                     return;
                 }
 
-                // Scenario C: Busy, but Queue is empty. Queue this call.
-                _pendingJobTcs = new TaskCompletionSource<bool>();
-                myWaitTicket = _pendingJobTcs;
+                // Rule: Enqueue this call.
+                _pendingJobTicket = new TaskCompletionSource<bool>();
+                myTicket = _pendingJobTicket;
             }
         }
 
-        // --- STEP 2: Execute or Wait ---
-        if (amIRunningImmediately)
-        {
-            await DoWorkAndProcessQueue();
-        }
-        else if (myWaitTicket != null)
-        {
-            // We are queued. Wait for the ticket to be called OR 3s timeout.
-            // Task.WhenAny returns the first task to finish (the signal or the timer)
-            var completedTask = await Task.WhenAny(myWaitTicket.Task, Task.Delay(3000));
+        // --- PHASE 2: Execution or Wait ---
 
-            if (completedTask == myWaitTicket.Task)
+        if (runImmediately)
+        {
+            await someService.RemoteWorkAsync();
+            // We do NOT set _isBusy = false here. 
+            // We wait for SomeEventHandler to do it.
+        }
+        else if (myTicket != null)
+        {
+            // We are queued. Wait for Signal OR 3s Timeout.
+            var completedTask = await Task.WhenAny(myTicket.Task, Task.Delay(3000));
+
+            if (completedTask == myTicket.Task)
             {
-                // We were signaled! Now we run.
-                await DoWorkAndProcessQueue();
+                // --- WAKE UP LOGIC ---
+                // We were signaled because SomeEventHandler finished the previous job
+                // and set _isBusy = false.
+
+                // CRITICAL: We must set _isBusy = true again immediately 
+                // because we are about to start running.
+                lock (_lock)
+                {
+                    _isBusy = true;
+                }
+
+                await someService.RemoteWorkAsync();
             }
             else
             {
-                // Timeout happened (Rule #2).
+                // --- TIMEOUT LOGIC ---
                 HandleTimeout();
             }
         }
     }
 
-    // The actual work logic, wrapped to ensure the queue is processed afterwards
-    private async Task DoWorkAndProcessQueue()
+    public void SomeEventHandler()
     {
-        try
-        {
-            // Do the actual remote work
-            await someService.RemoteWorkAsync();
-        }
-        catch (Exception ex)
-        {
-            // Log error
-        }
-        finally
-        {
-            // When work finishes, check if anyone is waiting
-            AdvanceQueue();
-        }
-    }
+        // 1. Do the action
+        SomeAction();
 
-    private void AdvanceQueue()
-    {
-        lock (_stateLock)
+        lock (_lock)
         {
-            if (_pendingJobTcs != null)
-            {
-                // Someone is waiting!
-                var nextJob = _pendingJobTcs;
-                _pendingJobTcs = null; // Clear the queue slot
+            // 2. ALWAYS set flag to false (as per your requirement)
+            _isBusy = false;
 
-                // Signal the waiting thread to wake up.
-                // Note: _isBusy remains true because the next guy takes over immediately.
-                nextJob.TrySetResult(true);
-            }
-            else
+            // 3. Check if someone is waiting to run
+            if (_pendingJobTicket != null)
             {
-                // No one waiting, we are done.
-                _isBusy = false;
+                var queuedJob = _pendingJobTicket;
+                _pendingJobTicket = null; // Remove from queue
+
+                // 4. Trigger the queued job.
+                // It will wake up, re-lock, set _isBusy=true, and run.
+                queuedJob.TrySetResult(true);
             }
         }
     }
 
     private void HandleTimeout()
     {
-        lock (_stateLock)
+        lock (_lock)
         {
-            // 1. Remove ourselves from the queue
-            if (_pendingJobTcs != null && !_pendingJobTcs.Task.IsCompleted)
+            // 1. Remove from queue (if we are still there)
+            if (_pendingJobTicket != null)
             {
-                _pendingJobTcs = null;
+                _pendingJobTicket = null;
             }
 
-            // 2. Requirement: "In this case the _isAwaitingEvent should also be reset."
-            // This is a safety valve. If the running thread is stuck for >3s,
-            // we force the flag to false so future calls can pass.
+            // 2. Reset flag (Safety mechanism)
+            // If the previous job is stuck forever, this allows the system to recover.
             _isBusy = false;
         }
     }
