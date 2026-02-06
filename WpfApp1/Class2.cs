@@ -154,4 +154,11 @@ async Task SomeEventHandler_FromAnotherThread()
 
 
 "Develop and deploy an internal WPF-based 'NLog Visualizer' tool by the end of Q2 2026. This tool will provide real-time filtering, color-coded severity levels, and exception stack-trace parsing for local and network log files, aiming to reduce the time spent on manual log analysis during bug investigations by 30%."
+
+
+I’m writing to discuss my current in-office schedule. I remain fully committed to my role and being present with the team, but I am currently facing a logistical constraint regarding my commute.
+
+My wife and I share a single vehicle, which makes being in the office five days a week difficult to sustain logistically. To ensure I can maintain punctuality and reliability, I would like to propose a hybrid schedule where I am in the office [Number, e.g., 3] days a week (e.g., [Days, e.g., Tuesday, Wednesday, Thursday]).
+
+I am confident that I can maintain full productivity and collaboration on the days I am working remotely. Please let me know if this arrangement would be acceptable or if we can find a time to discuss it further.
 */
