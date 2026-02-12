@@ -241,4 +241,132 @@ public class WifiChannelProcessor
         allChannels.Add(ch);
     }
 }
+
+
+
+unit test
+
+
+
+using NUnit.Framework; // or Xunit
+   using System.Collections.Generic;
+   using System.Linq;
+   
+   [TestFixture]
+   public class WifiChannelTests
+   {
+       [Test]
+       public void Verify_Refactor_Preserves_Legacy_Behavior()
+       {
+           // ARRANGE
+           int minChannel = 1;
+           int maxChannel = 165;
+   
+           // 1. Run the Old "Spaghetti" Logic
+           var legacy = new LegacyWifiGenerator();
+           legacy.Run(minChannel, maxChannel);
+   
+           // 2. Run the New "Clean" Logic
+           var modern = new WifiChannelProcessor(); // The class from my previous answer
+           var modernResults = modern.GenerateChannels(minChannel, maxChannel);
+   
+           // ASSERT - Compare the lists item by item
+           
+           // Check the Main "All Channels" list
+           CollectionAssert.AreEqual(legacy.Channels, modernResults.AllChannels, 
+               "The main list of generated channels differs!");
+   
+           // Check the "Left" (Start of Row) list
+           CollectionAssert.AreEqual(legacy.LeftChannels, modernResults.LeftChannels, 
+               "The Left/Start-of-row logic is broken.");
+   
+           // Check the "Right" (End of Row) list
+           CollectionAssert.AreEqual(legacy.RightChannels, modernResults.RightChannels, 
+               "The Right/End-of-row logic is broken.");
+       }
+   }
+   
+   // ==========================================
+   // MOCK CLASSES FOR THE TEST CONTEXT
+   // ==========================================
+   
+   // 1. The Original Logic (Recreated exactly from your image)
+   public class LegacyWifiGenerator
+   {
+       public List<int> Channels { get; } = new List<int>();
+       public List<int> LeftChannels { get; } = new List<int>();
+       public List<int> RightChannels { get; } = new List<int>();
+   
+       public void Run(int MinChannel, int MaxChannel)
+       {
+           for (var channel = MinChannel + 1; channel <= MaxChannel; channel++)
+           {
+               if (channel <= 14 ||
+                  (channel >= 34 && channel <= 48 && channel % 2 == 0) ||
+                  (channel >= 52 && channel <= 64 && channel % 4 == 0) ||
+                  (channel >= 100 && channel <= 140 && channel % 4 == 0) ||
+                  (channel >= 149 && channel % 4 == 1))
+               {
+                   if (Channels.Count % 9 == 8)
+                   {
+                       Channels.Add(channel);
+                       RightChannels.Add(channel);
+                   }
+                   else if (Channels.Count % 9 == 0)
+                   {
+                       LeftChannels.Add(channel);
+                       Channels.Add(channel);
+                   }
+                   else
+                   {
+                       Channels.Add(channel);
+                   }
+               }
+           }
+       }
+   }
+   
+   // 2. The Refactored Logic (Slightly adjusted to return the lists for testing)
+   public class WifiChannelProcessor
+   {
+       public (List<int> AllChannels, List<int> LeftChannels, List<int> RightChannels) GenerateChannels(int min, int max)
+       {
+           var channels = new List<int>();
+           var left = new List<int>();
+           var right = new List<int>();
+   
+           for (int ch = min + 1; ch <= max; ch++)
+           {
+               if (IsValidWifiChannel(ch))
+               {
+                   // Logic derived from my previous refactor
+                   int positionInRow = channels.Count % 9;
+   
+                   if (positionInRow == 0) left.Add(ch);
+                   
+                   // Add to main list
+                   channels.Add(ch);
+   
+                   // Note: The original code added to Right list AFTER adding to main list
+                   // if the count WAS 8 (meaning index 8, the 9th item). 
+                   // However, strictly looking at the image:
+                   // if (count % 9 == 8) { add to main; add to right; }
+                   // So checking BEFORE addition is correct.
+                   if (positionInRow == 8) right.Add(ch);
+               }
+           }
+           return (channels, left, right);
+       }
+   
+       private bool IsValidWifiChannel(int ch)
+       {
+           bool is24Ghz = ch <= 14;
+           bool isLow5Ghz = (ch >= 34 && ch <= 48) && (ch % 2 == 0);
+           bool isMid5Ghz = (ch >= 52 && ch <= 64) && (ch % 4 == 0);
+           bool isExt5Ghz = (ch >= 100 && ch <= 140) && (ch % 4 == 0);
+           bool isHigh5Ghz = (ch >= 149) && (ch % 4 == 1);
+   
+           return is24Ghz || isLow5Ghz || isMid5Ghz || isExt5Ghz || isHigh5Ghz;
+       }
+   }
 */
