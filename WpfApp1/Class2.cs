@@ -161,4 +161,84 @@ I’m writing to discuss my current in-office schedule. I remain fully committed
 My wife and I share a single vehicle, which makes being in the office five days a week difficult to sustain logistically. To ensure I can maintain punctuality and reliability, I would like to propose a hybrid schedule where I am in the office [Number, e.g., 3] days a week (e.g., [Days, e.g., Tuesday, Wednesday, Thursday]).
 
 I am confident that I can maintain full productivity and collaboration on the days I am working remotely. Please let me know if this arrangement would be acceptable or if we can find a time to discuss it further.
+
+
+
+using System.Collections.Generic;
+
+public class WifiChannelProcessor
+{
+    // Configuration constants for Grid Layout
+    private const int GridRowSize = 9;
+
+    public void GenerateChannels(int minChannel, int maxChannel)
+    {
+        var channels = new List<int>();
+        var leftChannels = new List<int>();   // Start of the row
+        var rightChannels = new List<int>();  // End of the row
+
+        // NOTE: Keeping original logic of starting at Min + 1. 
+        // Be aware this skips Channel 1 if MinChannel is 1.
+        for (int ch = minChannel + 1; ch <= maxChannel; ch++)
+        {
+            if (IsValidWifiChannel(ch))
+            {
+                ProcessChannelForGrid(ch, channels, leftChannels, rightChannels);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Determines if a number represents a valid standard WiFi Channel 
+    /// across 2.4GHz and 5GHz bands.
+    /// </summary>
+    private bool IsValidWifiChannel(int ch)
+    {
+        // 2.4 GHz Band (Channels 1-14)
+        bool is24Ghz = ch <= 14;
+
+        // 5 GHz UNII-1 (34-48). Original code allows even numbers (step 2).
+        // Standard implies step 4, but we preserve legacy logic here.
+        bool isLow5Ghz = (ch >= 34 && ch <= 48) && (ch % 2 == 0);
+
+        // 5 GHz UNII-2 (52-64). Step 4.
+        bool isMid5Ghz = (ch >= 52 && ch <= 64) && (ch % 4 == 0);
+
+        // 5 GHz UNII-2 Extended (100-140). Step 4.
+        bool isExt5Ghz = (ch >= 100 && ch <= 140) && (ch % 4 == 0);
+
+        // 5 GHz UNII-3 / Upper (149-165). Step 4, starting at 149.
+        bool isHigh5Ghz = (ch >= 149) && (ch % 4 == 1);
+
+        return is24Ghz || isLow5Ghz || isMid5Ghz || isExt5Ghz || isHigh5Ghz;
+    }
+
+    /// <summary>
+    /// Sorts the channel into the appropriate list (Left, Right, or Standard)
+    /// based on the current grid row position.
+    /// </summary>
+    private void ProcessChannelForGrid(int ch, List<int> allChannels, List<int> left, List<int> right)
+    {
+        int currentCount = allChannels.Count;
+
+        // Determine position in the row (0 to 8)
+        int positionInRow = currentCount % GridRowSize;
+
+        // Logic Mapping:
+        // Position 0 = First item in row -> Left List
+        // Position 8 = Last item in row  -> Right List
+        
+        if (positionInRow == (GridRowSize - 1)) // Index 8
+        {
+            right.Add(ch);
+        }
+        else if (positionInRow == 0) // Index 0
+        {
+            left.Add(ch);
+        }
+
+        // Always add to the master list
+        allChannels.Add(ch);
+    }
+}
 */
