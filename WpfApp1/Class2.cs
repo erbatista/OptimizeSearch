@@ -406,4 +406,67 @@ using NUnit.Framework; // or Xunit
        // Nice to have: Override ToString for debugging/logging
        public override string ToString() => $"{Band} - Ch {Number}";
    }
+
+
+public record Channel : IComparable<Channel>
+   {
+       public BandType Band { get; }
+       public uint Number { get; }
+   
+       // Primary Constructor
+       public Channel(BandType band, uint number)
+       {
+           // 1. Universal Guard Clause
+           if (number == 0) 
+               throw new ArgumentOutOfRangeException(nameof(number), "Channel 0 is never valid.");
+   
+           // 2. Conditional Validation (The "Smart" Logic)
+           // Only enforce strict band rules if we are NOT in Legacy mode.
+           if (band != BandType.Legacy)
+           {
+                if (band == BandType.Band2_4GHz && number > 14)
+                    throw new ArgumentOutOfRangeException(nameof(number), "Invalid 2.4GHz channel.");
+                
+                // Add other band-specific rules here
+           }
+   
+           Band = band;
+           Number = number;
+       }
+   
+       // ==========================================
+       // THE FACTORY METHOD (The Senior Dev Solution)
+       // ==========================================
+       /// <summary>
+       /// Creates a channel for legacy devices that do not report frequency band.
+       /// Usage: var ch = Channel.CreateLegacy(6);
+       /// </summary>
+       public static Channel CreateLegacy(uint number)
+       {
+           return new Channel(BandType.Legacy, number);
+       }
+   
+       // Update ToString for cleaner UI
+       public override string ToString()
+       {
+           if (Band == BandType.Legacy)
+               return $"Legacy Ch {Number}"; // Distinct display for weird channels
+               
+           return $"{Band.ToFriendlyString()} - Ch {Number}";
+       }
+   
+       // Update Sorting to push Legacy items to the bottom (or top)
+       public int CompareTo(Channel? other)
+       {
+           if (other is null) return 1;
+   
+           // Group by Band first
+           int bandComparison = Band.CompareTo(other.Band);
+           if (bandComparison != 0) return bandComparison;
+   
+           // Then by Number
+           return Number.CompareTo(other.Number);
+       }
+   }
+
 */
