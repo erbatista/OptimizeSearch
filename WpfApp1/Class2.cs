@@ -369,4 +369,41 @@ using NUnit.Framework; // or Xunit
            return is24Ghz || isLow5Ghz || isMid5Ghz || isExt5Ghz || isHigh5Ghz;
        }
    }
+
+
+// "record" keyword gives you Immutability + Value Equality for free
+   public record Channel : IComparable<Channel>
+   {
+       public BandType Band { get; }
+       public uint Number { get; }
+   
+       public Channel(BandType band, uint number)
+       {
+           // Guard Clauses: Protect your domain logic
+           if (number == 0) 
+               throw new ArgumentOutOfRangeException(nameof(number), "Channel 0 is invalid.");
+           
+           // Optional: Add specific logic (e.g., 2.4GHz must be <= 14)
+           if (band == BandType.GHz24 && number > 14)
+                throw new ArgumentOutOfRangeException(nameof(number), "Invalid 2.4GHz channel.");
+   
+           Band = band;
+           Number = number;
+       }
+   
+       // Implementing IComparable allows you to use .Sort() or OrderBy() easily
+       public int CompareTo(Channel? other)
+       {
+           if (other is null) return 1;
+           
+           // Sort by Band first, then by Number
+           int bandComparison = Band.CompareTo(other.Band);
+           if (bandComparison != 0) return bandComparison;
+           
+           return Number.CompareTo(other.Number);
+       }
+       
+       // Nice to have: Override ToString for debugging/logging
+       public override string ToString() => $"{Band} - Ch {Number}";
+   }
 */
