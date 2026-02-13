@@ -467,6 +467,19 @@ public record Channel : IComparable<Channel>
            // Then by Number
            return Number.CompareTo(other.Number);
        }
+
+public static string ToFriendlyString(this BandType band)
+    {
+        return band switch
+        {
+            BandType.Legacy     => "Legacy / No Band",
+            BandType.Band2_4GHz => "2.4 GHz",
+            BandType.Band5GHz   => "5 GHz",
+            BandType.Band6GHz   => "6 GHz",
+            BandType.Unknown    => "Unknown",
+            _                   => band.ToString() // Fallback for undefined values
+        };
+    }
    }
 
 */
