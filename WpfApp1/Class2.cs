@@ -483,3 +483,128 @@ public static string ToFriendlyString(this BandType band)
    }
 
 */
+
+/*
+ using System.Collections.Generic;
+   using System.Linq;
+   
+   // Using the Record definition we created earlier
+   // Ensure you have the BandType enum updated with Band6GHz
+   public class ChannelRepository : IChannelSelectionData
+   {
+       // Public Properties
+       public IReadOnlyList<Channel> LowBandChannels { get; }
+       public IReadOnlyList<Channel> HighBandChannels { get; }
+       public IReadOnlyList<Channel> SixGhzChannels { get; } // New!
+       public IReadOnlyList<Channel> AllChannels { get; }
+   
+       // Grid System (Left/Right edge detection)
+       // We use HashSet for O(1) lookups. 
+       // Since Channel is a record, equality checks work automatically.
+       private readonly HashSet<Channel> _leftChannels = new();
+       private readonly HashSet<Channel> _rightChannels = new();
+   
+       public IReadOnlyCollection<Channel> LeftChannels => _leftChannels;
+       public IReadOnlyCollection<Channel> RightChannels => _rightChannels;
+   
+       private const int GridRowSize = 9;
+   
+       public ChannelRepository()
+       {
+           // 1. Generate 2.4 GHz (1 - 14)
+           LowBandChannels = GenerateBand(BandType.Band2_4GHz, 1, 14, step: 1);
+   
+           // 2. Generate 5 GHz (Complex Logic)
+           HighBandChannels = Generate5GhzChannels();
+   
+           // 3. Generate 6 GHz (1 - 233, Step 4)
+           // Standard 6GHz starts at 1 and increments by 4 (1, 5, 9, ... 233)
+           SixGhzChannels = GenerateBand(BandType.Band6GHz, 1, 233, step: 4);
+   
+           // 4. Combine all into master list
+           AllChannels = LowBandChannels
+               .Concat(HighBandChannels)
+               .Concat(SixGhzChannels)
+               .ToList();
+       }
+   
+       /// <summary>
+       /// Generic generator for simple stepped bands (2.4GHz and 6GHz)
+       /// </summary>
+       private IReadOnlyList<Channel> GenerateBand(BandType band, uint min, uint max, uint step)
+       {
+           var list = new List<Channel>();
+           
+           for (uint i = min; i <= max; i += step)
+           {
+               var ch = new Channel(band, i);
+               list.Add(ch);
+               
+               // Apply Grid Logic for this specific band
+               CalculateGridPosition(ch, list.Count); 
+           }
+           return list;
+       }
+   
+       /// <summary>
+       /// Specific generator for 5GHz because of its irregular gaps and DFS ranges
+       /// </summary>
+       private IReadOnlyList<Channel> Generate5GhzChannels()
+       {
+           var list = new List<Channel>();
+           
+           // Use the validated logic we refactored previously
+           // Iterating 36 to 165
+           for (uint i = 36; i <= 165; i++)
+           {
+               // Logic: Is this a valid 5GHz channel?
+               bool isValid = 
+                   (i >= 36 && i <= 48 && i % 4 == 0) ||   // UNII-1
+                   (i >= 52 && i <= 64 && i % 4 == 0) ||   // UNII-2
+                   (i >= 100 && i <= 144 && i % 4 == 0) || // UNII-2e (Including 144)
+                   (i >= 149 && i <= 165 && i % 4 == 1);   // UNII-3
+   
+               if (isValid)
+               {
+                   var ch = new Channel(BandType.Band5GHz, i);
+                   list.Add(ch);
+                   CalculateGridPosition(ch, list.Count);
+               }
+           }
+           return list;
+       }
+   
+       /// <summary>
+       /// Centralized Logic for "Row of 9" calculation.
+       /// Uses 'index' (1-based count) to determine position.
+       /// </summary>
+       private void CalculateGridPosition(Channel ch, int currentCountInBand)
+       {
+           // currentCountInBand is 1-based (1, 2, 3...)
+           // Modulo math to find edges
+           
+           if (currentCountInBand % GridRowSize == 1) 
+           {
+               // First item in a row (Index 0, 9, 18...)
+               _leftChannels.Add(ch);
+           }
+           else if (currentCountInBand % GridRowSize == 0)
+           {
+               // Last item in a row (Index 8, 17, 26...)
+               _rightChannels.Add(ch);
+           }
+       }
+   
+       // This replaces your old 'GetAvailableChannels'
+       public IEnumerable<SurveyChannelVm> GetAvailableChannels()
+       {
+           // Now works safely because 'Channel' record handles equality correctly
+           return AllChannels.Select(ch => new SurveyChannelVm(
+               ch, 
+               false, 
+               _leftChannels.Contains(ch), 
+               _rightChannels.Contains(ch)
+           ));
+       }
+   }
+ */
