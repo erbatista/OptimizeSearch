@@ -608,3 +608,168 @@ public static string ToFriendlyString(this BandType band)
        }
    }
  */
+
+/*
+ public interface IChannelSelectionData
+   {
+       #region Properties
+   
+       /// <summary>
+       /// Legacy alias for 2.4 GHz Channels.
+       /// </summary>
+       IReadOnlyList<Channel> LowBandChannels { get; }
+   
+       /// <summary>
+       /// Legacy alias for 5 GHz Channels.
+       /// </summary>
+       IReadOnlyList<Channel> HighBandChannels { get; }
+   
+       /// <summary>
+       /// NEW: 6 GHz Channels (Wi-Fi 6E/7).
+       /// </summary>
+       IReadOnlyList<Channel> SixGhzChannels { get; }
+   
+       /// <summary>
+       /// Master list containing all channels from all bands.
+       /// </summary>
+       IReadOnlyList<Channel> Channels { get; }
+   
+       // UI Grid Helpers
+       IReadOnlyCollection<Channel> LeftChannels { get; }
+       IReadOnlyCollection<Channel> RightChannels { get; }
+   
+       #endregion
+   
+       #region Methods
+       IEnumerable<SurveyChannelVm> GetAvailableChannels();
+       #endregion
+   }
+
+------------------------
+using System.Collections.Generic;
+   using System.Linq;
+   
+   public class ChannelSelectionData : IChannelSelectionData
+   {
+       // ==========================================
+       // 1. Properties from Interface
+       // ==========================================
+       public IReadOnlyList<Channel> LowBandChannels { get; }
+       public IReadOnlyList<Channel> HighBandChannels { get; }
+       public IReadOnlyList<Channel> SixGhzChannels { get; } // New 6GHz support
+       public IReadOnlyList<Channel> Channels { get; }       // The master list
+   
+       // ==========================================
+       // 2. Internal Grid State (Left/Right logic)
+       // ==========================================
+       // NOTE: Requires 'Channel' to implement Equals/GetHashCode or be a 'record'
+       private readonly HashSet<Channel> _leftChannels = new();
+       private readonly HashSet<Channel> _rightChannels = new();
+   
+       public IReadOnlyCollection<Channel> LeftChannels => _leftChannels;
+       public IReadOnlyCollection<Channel> RightChannels => _rightChannels;
+   
+       private const int GridRowSize = 9;
+   
+       // ==========================================
+       // 3. Constructor (Data Generation)
+       // ==========================================
+       public ChannelSelectionData()
+       {
+           // Generate 2.4 GHz (Channels 1-14)
+           LowBandChannels = GenerateSteppedBand(BandType.Band2_4GHz, 1, 14, 1);
+   
+           // Generate 5 GHz (Complex standard logic)
+           HighBandChannels = Generate5GhzBand();
+   
+           // Generate 6 GHz (Channels 1-233, Step 4)
+           SixGhzChannels = GenerateSteppedBand(BandType.Band6GHz, 1, 233, 4);
+   
+           // Combine all into the master list
+           Channels = LowBandChannels
+               .Concat(HighBandChannels)
+               .Concat(SixGhzChannels)
+               .ToList();
+       }
+   
+       // ==========================================
+       // 4. Private Helper Methods
+       // ==========================================
+   
+       /// <summary>
+       /// Generates channels for regular bands like 2.4GHz and 6GHz.
+       /// </summary>
+       private IReadOnlyList<Channel> GenerateSteppedBand(BandType band, uint min, uint max, uint step)
+       {
+           var list = new List<Channel>();
+           // Using strict '<=' to ensure the last channel is included
+           for (uint i = min; i <= max; i += step)
+           {
+               var ch = new Channel(band, i);
+               list.Add(ch);
+               CalculateGridPosition(ch, list.Count);
+           }
+           return list;
+       }
+   
+       /// <summary>
+       /// Generates 5GHz channels based on standard UNII rules.
+       /// </summary>
+       private IReadOnlyList<Channel> Generate5GhzBand()
+       {
+           var list = new List<Channel>();
+   
+           // Range 36 to 165 covers all standard 5GHz channels
+           for (uint i = 36; i <= 165; i++)
+           {
+               // Valid if:
+               // UNII-1 (36-48), UNII-2 (52-64), UNII-2e (100-144), UNII-3 (149-165)
+               // Note: UNII-3 starts at 149 and steps by 4 (i % 4 == 1)
+               bool isValid =
+                   (i >= 36 && i <= 48 && i % 4 == 0) ||
+                   (i >= 52 && i <= 64 && i % 4 == 0) ||
+                   (i >= 100 && i <= 144 && i % 4 == 0) ||
+                   (i >= 149 && i <= 165 && i % 4 == 1);
+   
+               if (isValid)
+               {
+                   var ch = new Channel(BandType.Band5GHz, i);
+                   list.Add(ch);
+                   CalculateGridPosition(ch, list.Count);
+               }
+           }
+           return list;
+       }
+   
+       /// <summary>
+       /// Determines if a channel is the start (Left) or end (Right) of a UI row.
+       /// </summary>
+       private void CalculateGridPosition(Channel ch, int indexInBand)
+       {
+           // 1-based index from list.Count
+           if (indexInBand % GridRowSize == 1)
+           {
+               _leftChannels.Add(ch);
+           }
+           else if (indexInBand % GridRowSize == 0)
+           {
+               _rightChannels.Add(ch);
+           }
+       }
+   
+       // ==========================================
+       // 5. Public Method Implementation
+       // ==========================================
+       public IEnumerable<SurveyChannelVm> GetAvailableChannels()
+       {
+           return Channels.Select(ch => new SurveyChannelVm(
+               ch,
+               false, // IsSelected (Default)
+               _leftChannels.Contains(ch),
+               _rightChannels.Contains(ch)
+           ));
+       }
+   }
+
+
+ */
