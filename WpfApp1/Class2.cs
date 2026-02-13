@@ -826,3 +826,91 @@ using System.Collections.Generic;
        return list;
    }
  */
+
+/*
+ using System;
+   
+   public class Channel : IEquatable<Channel>, IComparable<Channel>
+   {
+       // Immutable Properties
+       public BandType Band { get; }
+       public uint Number { get; }
+   
+       // Constructor
+       public Channel(BandType band, uint number)
+       {
+           if (number == 0)
+               throw new ArgumentOutOfRangeException(nameof(number), "Channel 0 is invalid.");
+   
+           Band = band;
+           Number = number;
+       }
+   
+       // ==========================================
+       // 1. FACTORY METHOD (For Legacy Devices)
+       // ==========================================
+       public static Channel CreateLegacy(uint number)
+       {
+           return new Channel(BandType.Legacy, number);
+       }
+   
+       // ==========================================
+       // 2. EQUALITY (Crucial for HashSet!)
+       // ==========================================
+       
+       // Interface implementation (Faster)
+       public bool Equals(Channel other)
+       {
+           if (other is null) return false;
+           if (ReferenceEquals(this, other)) return true;
+   
+           return Band == other.Band && Number == other.Number;
+       }
+   
+       // Override Object.Equals (Required for HashSet / Dictionary)
+       public override bool Equals(object obj)
+       {
+           return Equals(obj as Channel);
+       }
+   
+       // Override GetHashCode (Required for HashSet)
+       // NOTE: HashCode.Combine is NOT available in .NET Standard 2.0, 
+       // so we use this classic "unchecked" math pattern.
+       public override int GetHashCode()
+       {
+           unchecked
+           {
+               int hash = 17;
+               hash = hash * 23 + Band.GetHashCode();
+               hash = hash * 23 + Number.GetHashCode();
+               return hash;
+           }
+       }
+   
+       // ==========================================
+       // 3. SORTING (IComparable)
+       // ==========================================
+       public int CompareTo(Channel other)
+       {
+           if (other is null) return 1;
+   
+           // Sort by Band first (Legacy < 2.4 < 5 < 6)
+           int bandCompare = Band.CompareTo(other.Band);
+           if (bandCompare != 0) return bandCompare;
+   
+           // Then by Channel Number
+           return Number.CompareTo(other.Number);
+       }
+   
+       // ==========================================
+       // 4. DEBUGGING
+       // ==========================================
+       public override string ToString()
+       {
+           if (Band == BandType.Legacy)
+               return $"Legacy Ch {Number}";
+   
+           return $"{Band} - Ch {Number}";
+       }
+   }
+ */
