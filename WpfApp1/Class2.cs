@@ -773,3 +773,56 @@ using System.Collections.Generic;
 
 
  */
+
+/*
+ /// <summary>
+   /// Generates 5GHz channels using the LEGACY logic (Step 2) to support 
+   /// older devices or non-standard frequencies (e.g., Ch 34, 38, 42).
+   /// </summary>
+   private IReadOnlyList<Channel> Generate5GhzBand()
+   {
+       var list = new List<Channel>();
+
+       // RESTORED LEGACY RANGE: 
+       // Original code checked (channel >= 34).
+       // Original code checked (channel % 2 == 0) for the lower band.
+       
+       for (uint i = 34; i <= 165; i++)
+       {
+           bool isValid = false;
+
+           // 1. Lower Band (UNII-1 & extensions)
+           // LEGACY BEHAVIOR: 34 - 48, Step 2 (Even numbers: 34, 36, 38... 48)
+           if (i >= 34 && i <= 48 && i % 2 == 0)
+           {
+               isValid = true;
+           }
+           // 2. Mid Band (UNII-2)
+           // Standard Behavior: 52 - 64, Step 4
+           else if (i >= 52 && i <= 64 && i % 4 == 0)
+           {
+               isValid = true;
+           }
+           // 3. Extended Band (UNII-2e)
+           // Standard Behavior: 100 - 144, Step 4
+           else if (i >= 100 && i <= 144 && i % 4 == 0)
+           {
+               isValid = true;
+           }
+           // 4. Upper Band (UNII-3)
+           // Standard Behavior: 149 - 165, Step 4 (Starts at 149)
+           else if (i >= 149 && i <= 165 && i % 4 == 1)
+           {
+               isValid = true;
+           }
+
+           if (isValid)
+           {
+               var ch = new Channel(BandType.Band5GHz, i);
+               list.Add(ch);
+               CalculateGridPosition(ch, list.Count);
+           }
+       }
+       return list;
+   }
+ */
