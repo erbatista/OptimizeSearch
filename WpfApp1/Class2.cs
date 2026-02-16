@@ -1085,3 +1085,74 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
        }
    }
  */
+
+
+/*
+ using Microsoft.VisualStudio.TestTools.UnitTesting;
+   using System.Collections.Generic;
+   
+   namespace ApolloERP.Ics.Tests.ChannelLogic
+   {
+       [TestClass]
+       public class ChannelTests
+       {
+           [TestMethod]
+           public void Equals_WithIdenticalValues_ReturnsTrue()
+           {
+               // ARRANGE
+               var ch1 = new Channel(BandType.Band2_4GHz, 6);
+               var ch2 = new Channel(BandType.Band2_4GHz, 6); // Different instance, same data
+   
+               // ASSERT
+               Assert.IsTrue(ch1.Equals(ch2), "Equals() failed for identical values.");
+               Assert.IsTrue(ch1 == ch2, "Operator == failed.");
+           }
+   
+           [TestMethod]
+           public void GetHashCode_WithIdenticalValues_ReturnsSameHash()
+           {
+               // ARRANGE
+               var ch1 = new Channel(BandType.Band5GHz, 36);
+               var ch2 = new Channel(BandType.Band5GHz, 36);
+   
+               // ASSERT
+               Assert.AreEqual(ch1.GetHashCode(), ch2.GetHashCode(),
+                   "GetHashCode must return the same value for identical objects.");
+           }
+   
+           [TestMethod]
+           public void HashSet_IgnoresDuplicates_WhenUsingCustomClass()
+           {
+               // ARRANGE
+               var set = new HashSet<Channel>();
+               var ch1 = new Channel(BandType.Band2_4GHz, 1);
+               var ch2 = new Channel(BandType.Band2_4GHz, 1); // Duplicate
+   
+               // ACT
+               set.Add(ch1);
+               set.Add(ch2); // Should be ignored
+   
+               // ASSERT
+               Assert.AreEqual(1, set.Count, "HashSet failed to detect duplicate Channel object.");
+           }
+   
+           [TestMethod]
+           public void Dictionary_CanRetrieveValue_UsingNewKeyInstance()
+           {
+               // ARRANGE
+               var dictionary = new Dictionary<Channel, string>();
+               var originalKey = new Channel(BandType.Band6GHz, 5);
+               dictionary.Add(originalKey, "Lobby Access Point");
+   
+               // ACT
+               // We create a BRAND NEW object instance to use as the lookup key
+               var lookupKey = new Channel(BandType.Band6GHz, 5);
+               bool found = dictionary.TryGetValue(lookupKey, out string result);
+   
+               // ASSERT
+               Assert.IsTrue(found, "Dictionary failed to find key using a new object instance.");
+               Assert.AreEqual("Lobby Access Point", result);
+           }
+       }
+   }
+ */
