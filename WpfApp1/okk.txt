@@ -322,6 +322,25 @@ Notes for Implementation:
     This is a high-risk change for breaking functionality. Thorough testing is required to verify that the communication with the endpoint is successful and that the application behaves as expected for both success and failure cases.
 
 
+**********************************************************************
+1. Eliminate the Redundant Outer Copy
+Your initial if statement checks if (result.MacAddress.Length == 4). Because you've guaranteed the length is exactly 4, calculating shortenedRes.Length - 4 results in 0. This means your Array.Copy is simply creating an exact, 1:1 duplicate of result.MacAddress. You can skip this copy entirely and just use the original array.
+
+2. Remove Inside-Loop Allocations (GC Pressure)
+Inside the foreach loop, the code currently allocates two brand-new arrays on every single iteration:
+
+Array.ConvertAll(...) creates a new byte[].
+
+new byte[4] creates another new byte[].
+
+For an application that might check interfaces frequently, this creates unnecessary garbage collection (GC) pressure. Since you are only checking 4 bytes, comparing them directly by index is vastly faster and requires zero allocations.
+
+3. Simplify with LINQ
+The foreach loop with an if (!condition) continue; match = x; break; is the exact structural pattern that LINQ's .FirstOrDefault() was designed to replace.
+
+Refactored Zero-Allocation Solution
+Here is a highly optimized version that achieves the exact same result without allocating any new arrays:
+
 *******************************************************************
 var targetMac = result.MacAddress;
 var interfaces = target.GetBluetoothInterfaces();
