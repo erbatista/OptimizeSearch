@@ -320,3 +320,33 @@ Notes for Implementation:
     Adjust any logic responsible for serializing the request and deserializing the response.
 
     This is a high-risk change for breaking functionality. Thorough testing is required to verify that the communication with the endpoint is successful and that the application behaves as expected for both success and failure cases.
+
+
+*******************************************************************
+var targetMac = result.MacAddress;
+var interfaces = target.GetBluetoothInterfaces();
+
+IBluetoothInterface? bluetoothInterface;
+
+if (targetMac.Length == 4)
+{
+    // Evaluates directly against the source arrays, generating zero GC pressure
+    bluetoothInterface = interfaces.FirstOrDefault(i =>
+    {
+        var val = i.BdAddress?.Address?.Val;
+        
+        if (val == null || val.Length < 4) return false;
+
+        int len = val.Length;
+        return (val[len - 4] ?? 0) == targetMac[0] &&
+               (val[len - 3] ?? 0) == targetMac[1] &&
+               (val[len - 2] ?? 0) == targetMac[2] &&
+               (val[len - 1] ?? 0) == targetMac[3];
+    });
+}
+else
+{
+    // WARNING: See note below regarding reference vs. value equality
+    bluetoothInterface = interfaces.FirstOrDefault(ti => ti.BdAddress?.Address == targetMac);
+}
+
