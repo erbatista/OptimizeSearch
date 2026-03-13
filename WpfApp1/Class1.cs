@@ -128,3 +128,116 @@ namespace WpfApp1
        }
    }
  */
+
+
+  /*
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Linq;
+
+namespace ApolloERP.Ics.Tests.ChannelLogic
+{
+    [TestClass]
+    public class ChannelSelectionDataTests
+    {
+        private ChannelSelectionData _repository;
+
+        [TestInitialize]
+        public void Setup()
+        {
+            _repository = new ChannelSelectionData();
+        }
+
+        [TestMethod]
+        public void Grid_Row1_Pure24GHz_StartsAt1_EndsAt9()
+        {
+            // ARRANGE
+            var channels = _repository.GetAvailableChannels().ToList();
+
+            // ACT
+            // Row 1 uses indices 1 through 9.
+            var ch1 = channels.First(c => c.Channel.Band == BandType.Band2_4GHz && c.Channel.Number == 1);
+            var ch9 = channels.First(c => c.Channel.Band == BandType.Band2_4GHz && c.Channel.Number == 9);
+
+            // ASSERT
+            Assert.IsTrue(ch1.IsLeft, "Index 1 (2.4GHz Ch 1) should be Left edge.");
+            Assert.IsTrue(ch9.IsRight, "Index 9 (2.4GHz Ch 9) should be Right edge.");
+        }
+
+        [TestMethod]
+        public void Grid_Row2_MixedBands_ContinuousFlow()
+        {
+            // ARRANGE
+            var channels = _repository.GetAvailableChannels().ToList();
+
+            // Row 2 uses indices 10 through 18.
+            // 2.4GHz provides indices 10-14 (Channels 10, 11, 12, 13, 14).
+            // 5GHz provides indices 15-18 (Channels 34, 36, 38, 40).
+
+            // ACT
+            var ch10 = channels.First(c => c.Channel.Band == BandType.Band2_4GHz && c.Channel.Number == 10);
+            var ch34 = channels.First(c => c.Channel.Band == BandType.Band5GHz && c.Channel.Number == 34);
+            var ch40 = channels.First(c => c.Channel.Band == BandType.Band5GHz && c.Channel.Number == 40);
+
+            // ASSERT
+            Assert.IsTrue(ch10.IsLeft, "Index 10 (2.4GHz Ch 10) should be Left edge of Row 2.");
+
+            // Because of continuous flow, Ch 34 is in the middle of Row 2, NOT a left edge.
+            Assert.IsFalse(ch34.IsLeft, "Index 15 (5GHz Ch 34) should NOT be Left edge. It flows continuously.");
+
+            // The right edge of Row 2 is index 18, which falls on 5GHz Channel 40.
+            Assert.IsTrue(ch40.IsRight, "Index 18 (5GHz Ch 40) should be Right edge of Row 2.");
+        }
+
+        [TestMethod]
+        public void Grid_Row3_Pure5GHz_ValidatesBugFix()
+        {
+            // ARRANGE
+            var channels = _repository.GetAvailableChannels().ToList();
+
+            // Row 3 uses indices 19 through 27.
+            // 5GHz continues: 42(19), 44(20), 46(21), 48(22), 52(23), 56(24), 60(25), 64(26), 100(27).
+
+            // ACT
+            var ch42 = channels.First(c => c.Channel.Band == BandType.Band5GHz && c.Channel.Number == 42);
+            var ch52 = channels.First(c => c.Channel.Band == BandType.Band5GHz && c.Channel.Number == 52);
+            var ch100 = channels.First(c => c.Channel.Band == BandType.Band5GHz && c.Channel.Number == 100);
+
+            // ASSERT
+            Assert.IsTrue(ch42.IsLeft, "Index 19 (5GHz Ch 42) should be Left edge of Row 3.");
+
+            // This explicitly tests the bug you caught with the debugger!
+            Assert.IsFalse(ch52.IsRight, "BUG FIX: Index 23 (5GHz Ch 52) is in the middle of Row 3, NOT a Right edge.");
+            Assert.IsFalse(ch52.IsLeft, "BUG FIX: Index 23 (5GHz Ch 52) is NOT a Left edge.");
+
+            // The actual right edge of Row 3 is index 27
+            Assert.IsTrue(ch100.IsRight, "Index 27 (5GHz Ch 100) should be the Right edge of Row 3.");
+        }
+
+        [TestMethod]
+        public void Grid_Row5_Mixed5GHzAnd6GHz()
+        {
+            // ARRANGE
+            var channels = _repository.GetAvailableChannels().ToList();
+
+            // Row 5 uses indices 37 through 45.
+            // 5GHz provides indices 37-42 (Channels 140, 149, 153, 157, 161, 165).
+            // 6GHz starts at index 43, providing 43-45 (Channels 1, 5, 9).
+
+            // ACT
+            var ch140 = channels.First(c => c.Channel.Band == BandType.Band5GHz && c.Channel.Number == 140);
+            var ch1_6g = channels.First(c => c.Channel.Band == BandType.Band6GHz && c.Channel.Number == 1);
+            var ch9_6g = channels.First(c => c.Channel.Band == BandType.Band6GHz && c.Channel.Number == 9);
+            var ch13_6g = channels.First(c => c.Channel.Band == BandType.Band6GHz && c.Channel.Number == 13);
+
+            // ASSERT
+            Assert.IsTrue(ch140.IsLeft, "Index 37 (5GHz Ch 140) should be Left edge of Row 5.");
+
+            Assert.IsFalse(ch1_6g.IsLeft, "Index 43 (6GHz Ch 1) flows continuously, it is NOT Left edge.");
+
+            Assert.IsTrue(ch9_6g.IsRight, "Index 45 (6GHz Ch 9) should be Right edge of Row 5.");
+
+            Assert.IsTrue(ch13_6g.IsLeft, "Index 46 (6GHz Ch 13) should be Left edge of Row 6.");
+        }
+    }
+}
+  */
