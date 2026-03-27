@@ -241,3 +241,99 @@ namespace ApolloERP.Ics.Tests.ChannelLogic
     }
 }
   */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  /*
+1 y 2
+Since you’re evaluating a high-performing lead in a software development context, the goal is to highlight how their technical depth and management style directly translate into team velocity and code quality.
+
+Here are tailored drafts you can use or adapt.
+
+### **Question 1: Strengths & Contributions**
+Focus on the balance between their "hands-on" technical support and their "big-picture" planning.
+
+* **Technical Mentorship & Problem Solving:**
+    > "[Lead's Name] is an exceptional technical resource for the entire team. They consistently step in to help resolve complex architectural issues or "blocker" bugs that would otherwise stall development. This direct support not only keeps our sprints on track but serves as a continuous learning opportunity for the rest of us, significantly raising the team's overall technical bar."
+* **Strategic Planning & Execution:**
+    > "They possess a keen sense of project management and planning. [Lead's Name] excels at breaking down high-level requirements into actionable technical tasks, ensuring that deadlines are realistic while maintaining high standards for code quality. Their ability to anticipate potential technical debt or scaling issues during the planning phase has saved the department significant time and resources."
+* **Alignment with Core Values (Innovation & Reliability):**
+    > "By fostering an environment where complex challenges are met with collaborative solutions, [Lead's Name] embodies our value of **Innovation**. Their management style ensures that we are not just shipping features, but building a robust and maintainable codebase, which directly contributes to the long-term **Reliability** of our products."
+
+---
+
+### **Question 2: Areas of Opportunity for Improvement**
+Even for an "awesome" lead, "opportunities" usually involve moving from being a "star individual" to a "multiplier" for the broader organization.
+
+* **Strategic Delegation:**
+    > "Because [Lead's Name] is such a strong problem-solver, they are often the 'go-to' person for every crisis. An area for growth would be further delegating these complex tasks to senior developers earlier in the process. This would allow [Lead's Name] to focus even more on high-level strategy and roadmap planning while empowering other team members to take more ownership of critical system components."
+* **Broader Organizational Influence:**
+    > "Given their deep understanding of our tech stack and planning capabilities, there is an opportunity for [Lead's Name] to exert more influence at the cross-departmental level. Sharing their planning methodologies or architectural insights with other teams could help standardize best practices across the entire engineering department."
+* **Focus on Long-Term Professional Development:**
+    > "As the team grows, I would encourage [Lead's Name] to continue shifting their focus toward formalized career coaching for the team. While their ad-hoc technical help is invaluable, setting aside more dedicated time for structured 1-on-1 career pathing would further strengthen team retention and morale."
+
+---
+
+### **Key Phrases for Software Leads**
+* **"Force Multiplier":** A great term for a lead whose presence makes everyone else around them more effective.
+* **"Architectural Integrity":** Use this to describe their commitment to doing things the "right" way rather than just the "fast" way.
+* **"Predictable Velocity":** A result of their "good sense for planning."
+
+Would you like me to adjust any of these to focus on a specific project or a particular technology your team has been working on lately?
+   */
+
+
+
+
+/*
+ This final section is a great place to advocate for your Lead’s career progression or highlight the "soft skills" that make the team culture work. Since you mentioned he is an "awesome" leader, you can use this space to make a strong case for his continued growth within the company.
+
+Here are three different ways to approach this:
+
+### **Option 1: The "Promotability" Focus**
+Use this if you want to signal to management that he is ready for more responsibility or a higher title.
+> "[Lead's Name] consistently operates at a level above their current role. Beyond their technical contributions, their ability to shield the team from outside distractions and provide clear, stable direction during high-pressure sprints is invaluable. I strongly believe they are ready for further leadership opportunities, as they already possess the technical and managerial maturity to handle larger-scale organizational challenges."
+
+### **Option 2: The "Team Culture & Morale" Focus**
+Use this to highlight how his leadership style makes the team a better place to work.
+> "What sets [Lead's Name] apart is their commitment to fostering a collaborative and psychologically safe environment. They encourage us to tackle difficult problems without fear of failure, which has directly led to more creative solutions in our codebase. Their presence is a major factor in our team's high morale and low turnover; they are exactly the type of leader we should strive to retain and replicate across the department."
+
+### **Option 3: The "Concise & Impactful" Summary**
+A shorter version that sums up everything you’ve said so far.
+> "Overall, [Lead's Name] is a pillar of the engineering team. Whether it’s architecting a complex solution or managing tight delivery schedules, they handle it with a level of professionalism and technical depth that inspires the whole team. It is a privilege to work under their guidance, and I look forward to seeing their continued impact on our project's success."
+
+---
+
+### **A Few Closing Tips:**
+* **Be the "Hype Man":** If they really are "awesome," don't be afraid to be enthusiastic. Management looks at these to see who the rising stars are.
+* **Mention Retention:** Companies care about keeping good people. Explicitly stating that a lead makes you want to stay on the team is one of the highest compliments you can give.
+
+Would you like me to combine any of these into a single, comprehensive paragraph for you?
+
+
+********************************************************************
+ * Here is a comprehensive version that blends his technical mentorship, management skills, and overall impact into a single, high-impact paragraph:
+
+> "Overall, **[Lead's Name]** is an exceptional asset to the engineering team and the broader organization. He perfectly balances deep technical expertise with a natural talent for project management and strategic planning. Whether he is diving into the code to help the team resolve complex architectural blockers or meticulously mapping out a sprint to ensure a predictable and high-quality delivery, his leadership is consistently impactful. Beyond his technical contributions, he fosters a collaborative and psychologically safe environment where every developer feels supported and empowered to grow. His presence is a primary driver of our team’s high velocity and morale, and he truly embodies the standard of a **'force multiplier'** within the department."
+
+---
+
+### **How to finalize this:**
+* **The Name:** Replace `[Lead's Name]` with his actual name.
+* **The Impact:** If there was a specific "win" this quarter (like a major release or a particularly difficult bug he helped squash), you could add a one-sentence specific example right after the first sentence.
+* **The Tone:** This draft is professional yet highly enthusiastic, which is perfect for an "awesome" lead you want to see recognized.
+
+Would you like me to help you format these final answers into a single document so you can easily copy and paste them into the review system?
+ */
